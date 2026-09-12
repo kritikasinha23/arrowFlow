@@ -9,14 +9,17 @@ export type Flight = {
 
 /**
  * Hit-test while any number of weaves may be playing.
- * - Empty hit: ignore.
+ * - Board already won (`isWon`): confetti blast at the tap; never start a weave.
+ * - Empty hit while playing: ignore (no mid-level tap blast).
  * - Already flying (free ghost or blocked reverse): ignore.
  * - Any other remaining piece: start immediately.
  */
 export function acceptTap(
   flights: Flight[],
   hitId: string | null,
-): { action: "start" | "ignore" } {
+  isWon = false,
+): { action: "start" | "ignore" | "blast" } {
+  if (isWon) return { action: "blast" };
   if (!hitId) return { action: "ignore" };
   if (flights.some((f) => f.id === hitId)) return { action: "ignore" };
   return { action: "start" };

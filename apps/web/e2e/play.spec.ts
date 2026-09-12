@@ -68,8 +68,28 @@ test("tapping a free piece removes it", async ({ page }) => {
   await page.goto("/play/flow_0002");
   const canvas = page.getByTestId("board-canvas");
   await expect(canvas).toHaveAttribute("data-piece-count", "2");
-  await clickHit(page, "B");
+  await expect(canvas).toHaveAttribute("data-hit-B", /,/);
+  const xy = await canvas.getAttribute("data-hit-B");
+  const [x, y] = (xy ?? "0,0").split(",").map(Number);
+  await canvas.click({ position: { x, y } });
+  await expect(canvas).toHaveAttribute("data-tap-fx", "false");
+  await expect(canvas).toHaveAttribute("data-won", "false");
+  await expect(canvas).toHaveAttribute("data-busy", "false", { timeout: 4000 });
   await expect(canvas).toHaveAttribute("data-piece-count", "1");
+});
+
+test("board tap after win blasts confetti without starting a weave", async ({ page }) => {
+  await page.goto("/play/flow_0001");
+  await clickHit(page, "A");
+  await expect(page.getByTestId("win-card")).toBeVisible();
+  const canvas = page.getByTestId("board-canvas");
+  await expect(canvas).toHaveAttribute("data-won", "true");
+  await expect(canvas).toHaveAttribute("data-piece-count", "0");
+  await canvas.click({ position: { x: 36, y: 36 } });
+  await expect(canvas).toHaveAttribute("data-tap-fx", "true");
+  await expect(canvas).toHaveAttribute("data-piece-count", "0");
+  await expect(page.getByTestId("win-next")).toBeVisible();
+  await expect(page.getByTestId("win-replay")).toBeVisible();
 });
 
 test("blocked piece turns red and hearts go 3 to 2 then stay 2", async ({ page }) => {

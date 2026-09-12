@@ -4,8 +4,11 @@ export type { GridPoint, LinesMode, Point } from "./coordinate-mapper";
 export { BoardRenderer, hashDots, headingRays } from "./board-renderer";
 export type { HeadingRay, RenderArrow, RenderFrame } from "./board-renderer";
 export {
+  TAP_CONFETTI_COUNT,
   TAP_FX_MS,
+  TAP_SPEED_SCALE,
   WIN_CARD_AFTER_MS,
+  WIN_CONFETTI_COUNT,
   WIN_FX_MS,
   seedConfetti,
   seedTapConfetti,

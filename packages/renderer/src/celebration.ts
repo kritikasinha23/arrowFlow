@@ -3,6 +3,12 @@ import type { Point } from "@arrowflow/twine";
 export const WIN_FX_MS = 2400;
 export const WIN_CARD_AFTER_MS = 560;
 export const TAP_FX_MS = 500;
+/** Level-clear party: three staggered bursts. */
+export const WIN_CONFETTI_COUNT = 108;
+/** Post-win canvas tap: one burst, ~⅓ fewer bits than clear. */
+export const TAP_CONFETTI_COUNT = 72;
+/** Slightly slower than the clear burst so a tap reads as a smaller pop. */
+export const TAP_SPEED_SCALE = 0.85;
 
 /** Constant ripple speed in CSS/world pixels — not a fraction of max radius. */
 export const RIPPLE_SPEED_PX_S = 230;
@@ -61,7 +67,7 @@ export function rippleDelaySec(distPx: number): number {
 
 export function seedConfetti(
   origin: Point,
-  count = 108,
+  count = WIN_CONFETTI_COUNT,
   seed = 42,
   opts: ConfettiSeedOpts = {},
 ): ConfettiBit[] {
@@ -93,7 +99,11 @@ export function seedConfetti(
 }
 
 export function seedTapConfetti(origin: Point, seed = 1): ConfettiBit[] {
-  return seedConfetti(origin, 14, seed, { bursts: 1, speedScale: 0.62, spread: 0 });
+  return seedConfetti(origin, TAP_CONFETTI_COUNT, seed, {
+    bursts: 1,
+    speedScale: TAP_SPEED_SCALE,
+    spread: 0,
+  });
 }
 
 export function latticeRipple(

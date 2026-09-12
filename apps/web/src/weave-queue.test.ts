@@ -32,6 +32,18 @@ describe("acceptTap", () => {
     expect(acceptTap([], null)).toEqual({ action: "ignore" });
     expect(acceptTap([{ id: "A", kind: "free" }], null)).toEqual({ action: "ignore" });
   });
+
+  it("does not blast mid-level on a piece or empty tap", () => {
+    expect(acceptTap([], "A", false)).toEqual({ action: "start" });
+    expect(acceptTap([], null, false)).toEqual({ action: "ignore" });
+    expect(acceptTap([{ id: "A", kind: "free" }], "B", false).action).not.toBe("blast");
+  });
+
+  it("blasts at the tap when isWon and never starts a weave", () => {
+    expect(acceptTap([], null, true)).toEqual({ action: "blast" });
+    expect(acceptTap([], "A", true)).toEqual({ action: "blast" });
+    expect(acceptTap([{ id: "A", kind: "free" }], "B", true)).toEqual({ action: "blast" });
+  });
 });
 
 describe("occupancy timing", () => {

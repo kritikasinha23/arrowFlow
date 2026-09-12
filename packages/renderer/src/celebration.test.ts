@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   RIPPLE_PULSE_S,
   RIPPLE_SPEED_PX_S,
+  TAP_CONFETTI_COUNT,
+  WIN_CONFETTI_COUNT,
   WIN_FX_MS,
   latticeRipple,
   rippleDelaySec,
@@ -27,9 +29,17 @@ describe("celebration", () => {
   });
 
   it("seeds a smaller single-burst tap blast", () => {
-    const bits = seedTapConfetti({ x: 10, y: 20 }, 3);
-    expect(bits.length).toBeLessThan(20);
+    const origin = { x: 10, y: 20 };
+    const win = seedConfetti(origin);
+    const bits = seedTapConfetti(origin, 3);
+    expect(win).toHaveLength(WIN_CONFETTI_COUNT);
+    expect(new Set(win.map((b) => b.delay)).size).toBe(3);
+    expect(bits).toHaveLength(TAP_CONFETTI_COUNT);
+    expect(bits.length).toBeLessThan(win.length);
     expect(bits.every((b) => b.delay === 0 && b.x === 10 && b.y === 20)).toBe(true);
+    const winSpd = Math.max(...win.map((b) => Math.hypot(b.vx, b.vy)));
+    const tapSpd = Math.max(...bits.map((b) => Math.hypot(b.vx, b.vy)));
+    expect(tapSpd).toBeLessThan(winSpd);
   });
 
   it("delays each lattice pulse by distance / constant speed", () => {

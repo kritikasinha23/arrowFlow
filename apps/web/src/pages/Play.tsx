@@ -460,9 +460,9 @@ export function Play() {
   );
 
   const startWeave = useCallback(
-    (id: string, tap?: { x: number; y: number }) => {
+    (id: string) => {
       const engine = engineRef.current;
-      if (!engine || engine.isOutOfHearts) return;
+      if (!engine || engine.isOutOfHearts || engine.isWon) return;
       if (flightsRef.current.has(id)) return;
       const arrow = engine.board.arrows.find((a) => a.id === id);
       if (!arrow) return;
@@ -486,8 +486,6 @@ export function Play() {
           durationMs = freeWeaveDurationMs(polylineLength(rest), travel);
           lastExitRef.current = mapper.cellCenter(arrow.headCell);
         }
-        const blastAt = tap ?? lastExitRef.current ?? { x: 0, y: 0 };
-        spawnTapConfetti(blastAt);
         engine.commitFree(id);
         moveLogRef.current.push({
           arrowId: id,
@@ -539,19 +537,23 @@ export function Play() {
       );
       flight.cancel = ticker.cancel;
     },
-    [paint, syncHud, startWinFx, spawnTapConfetti],
+    [paint, syncHud, startWinFx],
   );
 
   const onTap = (cssX: number, cssY: number) => {
     const engine = engineRef.current;
     const mapper = mapperRef.current;
     const renderer = rendererRef.current;
-    if (!engine || !mapper || !renderer || engine.isOutOfHearts) return;
+    if (!engine || !mapper || !renderer) return;
+    if (engine.isOutOfHearts && !engine.isWon) return;
     const arrows = toRender(engine.board.arrows, new Map(), null, 0);
     const id = renderer.hitTest(mapper, arrows, cssX, cssY);
-    if (acceptTap([...flightsRef.current.values()], id).action === "start" && id) {
-      startWeave(id, { x: cssX, y: cssY });
+    const decision = acceptTap([...flightsRef.current.values()], id, engine.isWon);
+    if (decision.action === "blast") {
+      spawnTapConfetti({ x: cssX, y: cssY });
+      return;
     }
+    if (decision.action === "start" && id) startWeave(id);
   };
 
   const localPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
