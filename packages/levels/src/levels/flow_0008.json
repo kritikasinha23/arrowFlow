@@ -1,0 +1,23 @@
+{
+  "width": 5,
+  "height": 4,
+  "levelId": "flow_0008",
+  "difficulty": 2,
+  "arrows": [
+    {
+      "id": "U",
+      "cells": [
+        { "row": 0, "col": 1 },
+        { "row": 1, "col": 1 },
+        { "row": 2, "col": 1 },
+        { "row": 2, "col": 2 },
+        { "row": 2, "col": 3 },
+        { "row": 1, "col": 3 },
+        { "row": 0, "col": 3 }
+      ],
+      "direction": "up",
+      "headCell": { "row": 0, "col": 3 },
+      "isRed": false
+    }
+  ]
+}

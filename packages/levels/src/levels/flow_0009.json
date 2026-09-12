@@ -1,0 +1,48 @@
+{
+  "width": 4,
+  "height": 4,
+  "levelId": "flow_0009",
+  "difficulty": 2,
+  "arrows": [
+    {
+      "id": "N",
+      "cells": [
+        { "row": 3, "col": 0 },
+        { "row": 2, "col": 0 }
+      ],
+      "direction": "up",
+      "headCell": { "row": 2, "col": 0 },
+      "isRed": false
+    },
+    {
+      "id": "S",
+      "cells": [
+        { "row": 0, "col": 3 },
+        { "row": 1, "col": 3 }
+      ],
+      "direction": "down",
+      "headCell": { "row": 1, "col": 3 },
+      "isRed": false
+    },
+    {
+      "id": "W",
+      "cells": [
+        { "row": 0, "col": 2 },
+        { "row": 0, "col": 1 }
+      ],
+      "direction": "left",
+      "headCell": { "row": 0, "col": 1 },
+      "isRed": false
+    },
+    {
+      "id": "E",
+      "cells": [
+        { "row": 3, "col": 1 },
+        { "row": 3, "col": 2 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 3, "col": 2 },
+      "isRed": false
+    }
+  ]
+}

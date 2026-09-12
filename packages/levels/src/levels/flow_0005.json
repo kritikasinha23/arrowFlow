@@ -1,0 +1,21 @@
+{
+  "width": 5,
+  "height": 4,
+  "levelId": "flow_0005",
+  "difficulty": 2,
+  "arrows": [
+    {
+      "id": "L",
+      "cells": [
+        { "row": 2, "col": 1 },
+        { "row": 1, "col": 1 },
+        { "row": 0, "col": 1 },
+        { "row": 0, "col": 2 },
+        { "row": 0, "col": 3 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 0, "col": 3 },
+      "isRed": false
+    }
+  ]
+}

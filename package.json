@@ -1,0 +1,19 @@
+{
+  "name": "arrow-escape",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node --require ./vitest.preload.cjs ./node_modules/vitest/vitest.mjs run",
+    "dev:api": "node apps/api/scripts/run-dev.cjs",
+    "dev:web": "npm run dev --workspace @arrowflow/web"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vitest": "^0.34.6"
+  }
+}

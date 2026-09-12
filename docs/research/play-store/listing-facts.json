@@ -1,0 +1,51 @@
+{
+  "source": "https://play.google.com/store/apps/details?id=com.ecffri.arrows&hl=en_IN",
+  "fetched": "2026-09-12",
+  "browserAutomation": "blocked — listing HTML and official gallery images downloaded instead",
+  "identity": {
+    "title": "Arrows – Puzzle Escape",
+    "developer": "Lessmore GmbH",
+    "package": "com.ecffri.arrows",
+    "supportEmail": "arrows@lessmore.games",
+    "developerEmail": "support@lessmore.games",
+    "address": "Haideweg 12, 74927 Eschelbronn, Germany"
+  },
+  "store": {
+    "rating": 4.8,
+    "reviewsLabelIN": "20.4L",
+    "reviewsLabelUS": "2.04M",
+    "installs": "100M+",
+    "installsExactHint": 113540988,
+    "contentRating": "Everyone",
+    "containsAds": true,
+    "inAppPurchases": true,
+    "iapRangeIN": "₹39.99 - ₹1,100.00 per item",
+    "updated": "2026-09-01",
+    "whatsNew": "Bug fixes. Thanks for playing!",
+    "offline": true,
+    "dataSafety": ["Device or other IDs collected", "Device or other IDs shared with third parties", "Encrypted in transit", "Data cannot be deleted"]
+  },
+  "descriptionShort": "Minimalist logic puzzle: extract each arrow without causing a collision. Thousands of handcrafted levels, no timers, hint system, hearts.",
+  "similarAppsShown": ["Block Blast!", "Vita Mahjong", "Tile Explorer - Triple Match", "Block Crush: Block Puzzle Game"],
+  "galleryFiles": [
+    "gallery-01.webp",
+    "gallery-02.webp",
+    "gallery-03.webp",
+    "gallery-04.webp",
+    "gallery-05.webp",
+    "gallery-06.webp",
+    "gallery-07.webp",
+    "gallery-08.webp",
+    "gallery-09.webp",
+    "gallery-10.webp"
+  ],
+  "visualNotesFromGallery": {
+    "background": "plain white",
+    "arrows": "thin black orthogonal polylines with arrowheads; pieces pack into maze-like figures",
+    "hud": "three small hearts top-center; no visible undo/hint/lines chrome in marketing crops",
+    "linesFeature": "dotted occupancy grid visible when some arrows are highlighted red",
+    "selection": "one or two arrows tinted red; remaining hearts can go gray",
+    "home": "triangle-A wordmark, current level number, single blue pill Play CTA",
+    "icon": "black orthogonal arrows on white with red ORIGINAL ribbon — do not copy"
+  }
+}

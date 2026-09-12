@@ -1,0 +1,18 @@
+{
+  "name": "@arrowflow/api",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "node ./scripts/run-dev.cjs",
+    "start": "node ./scripts/run-dev.cjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.6.0",
+    "hono": "^3.12.12",
+    "undici": "^5.28.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11"
+  }
+}

@@ -1,0 +1,140 @@
+{
+  "width": 6,
+  "height": 6,
+  "levelId": "flow_0006",
+  "difficulty": 3,
+  "arrows": [
+    {
+      "id": "A",
+      "cells": [
+        { "row": 0, "col": 0 },
+        { "row": 0, "col": 1 },
+        { "row": 0, "col": 2 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 0, "col": 2 },
+      "isRed": false
+    },
+    {
+      "id": "B",
+      "cells": [
+        { "row": 0, "col": 3 },
+        { "row": 0, "col": 4 },
+        { "row": 0, "col": 5 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 0, "col": 5 },
+      "isRed": false
+    },
+    {
+      "id": "C",
+      "cells": [
+        { "row": 1, "col": 0 },
+        { "row": 1, "col": 1 },
+        { "row": 1, "col": 2 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 1, "col": 2 },
+      "isRed": false
+    },
+    {
+      "id": "D",
+      "cells": [
+        { "row": 1, "col": 3 },
+        { "row": 1, "col": 4 },
+        { "row": 1, "col": 5 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 1, "col": 5 },
+      "isRed": false
+    },
+    {
+      "id": "E",
+      "cells": [
+        { "row": 2, "col": 0 },
+        { "row": 2, "col": 1 },
+        { "row": 2, "col": 2 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 2, "col": 2 },
+      "isRed": false
+    },
+    {
+      "id": "F",
+      "cells": [
+        { "row": 2, "col": 3 },
+        { "row": 2, "col": 4 },
+        { "row": 2, "col": 5 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 2, "col": 5 },
+      "isRed": false
+    },
+    {
+      "id": "G",
+      "cells": [
+        { "row": 3, "col": 0 },
+        { "row": 3, "col": 1 },
+        { "row": 3, "col": 2 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 3, "col": 2 },
+      "isRed": false
+    },
+    {
+      "id": "H",
+      "cells": [
+        { "row": 3, "col": 3 },
+        { "row": 3, "col": 4 },
+        { "row": 3, "col": 5 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 3, "col": 5 },
+      "isRed": false
+    },
+    {
+      "id": "I",
+      "cells": [
+        { "row": 4, "col": 0 },
+        { "row": 4, "col": 1 },
+        { "row": 4, "col": 2 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 4, "col": 2 },
+      "isRed": false
+    },
+    {
+      "id": "J",
+      "cells": [
+        { "row": 4, "col": 3 },
+        { "row": 4, "col": 4 },
+        { "row": 4, "col": 5 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 4, "col": 5 },
+      "isRed": false
+    },
+    {
+      "id": "K",
+      "cells": [
+        { "row": 5, "col": 0 },
+        { "row": 5, "col": 1 },
+        { "row": 5, "col": 2 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 5, "col": 2 },
+      "isRed": false
+    },
+    {
+      "id": "L",
+      "cells": [
+        { "row": 5, "col": 3 },
+        { "row": 5, "col": 4 },
+        { "row": 5, "col": 5 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 5, "col": 5 },
+      "isRed": false
+    }
+  ]
+}

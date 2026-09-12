@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+coverage/
+.DS_Store
+Thumbs.db
+*.log
+.turbo/
+.cache/
+*.sqlite
+*.sqlite-*
+apps/api/data/
+.env
+.env.local
+playwright-report/
+test-results/

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@arrowflow/twine": ["../../packages/twine/src/index.ts"],
+      "@arrowflow/renderer": ["../../packages/renderer/src/index.ts"],
+      "@arrowflow/engine": ["./src/engine-bridge.ts"],
+      "@arrowflow/levels": ["./src/levels-shim.ts"]
+    }
+  },
+  "include": ["src", "../../packages/twine/src", "../../packages/renderer/src"]
+}

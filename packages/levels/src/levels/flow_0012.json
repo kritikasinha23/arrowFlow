@@ -1,0 +1,31 @@
+{
+  "width": 4,
+  "height": 4,
+  "levelId": "flow_0012",
+  "difficulty": 2,
+  "arrows": [
+    {
+      "id": "A",
+      "cells": [
+        { "row": 1, "col": 3 },
+        { "row": 1, "col": 2 },
+        { "row": 1, "col": 1 },
+        { "row": 1, "col": 0 }
+      ],
+      "direction": "left",
+      "headCell": { "row": 1, "col": 0 },
+      "isRed": false
+    },
+    {
+      "id": "B",
+      "cells": [
+        { "row": 2, "col": 0 },
+        { "row": 2, "col": 1 },
+        { "row": 2, "col": 2 }
+      ],
+      "direction": "right",
+      "headCell": { "row": 2, "col": 2 },
+      "isRed": false
+    }
+  ]
+}
