@@ -131,10 +131,13 @@ test("weave takes real time on a free solo level", async ({ page }) => {
   const [x, y] = (xy ?? "0,0").split(",").map(Number);
   await canvas.click({ position: { x, y } });
   await expect(canvas).toHaveAttribute("data-busy", "true");
-  await expect(canvas).toHaveAttribute("data-piece-count", "1");
+  await expect(canvas).toHaveAttribute("data-piece-count", "0");
+  await expect(canvas).toHaveAttribute("data-flying", /A/);
+  await expect(canvas).toHaveAttribute("data-ghost-count", "1");
   await page.waitForTimeout(50);
-  await expect(canvas).toHaveAttribute("data-piece-count", "1");
-  await expect(canvas).toHaveAttribute("data-busy", "false", { timeout: 2000 });
+  await expect(canvas).toHaveAttribute("data-flying", /A/);
+  await expect(canvas).toHaveAttribute("data-busy", "false", { timeout: 3500 });
+  await expect(canvas).toHaveAttribute("data-ghost-count", "0");
   await expect(canvas).toHaveAttribute("data-piece-count", "0");
 });
 
@@ -169,10 +172,10 @@ test("hash toggles heading rays and keeps lattice dots", async ({ page }) => {
   await expect(canvas).toHaveAttribute("data-lattice-count", "4");
 });
 
-test("queued tap starts after the current weave commits", async ({ page }) => {
+test("two free taps fly at once without a queue", async ({ page }) => {
   await page.goto("/play/flow_0002");
   const canvas = page.getByTestId("board-canvas");
-  await expect(canvas).toHaveAttribute("data-busy", "false");
+  await expect(canvas).toHaveAttribute("data-piece-count", "2");
   await expect(canvas).toHaveAttribute("data-hit-A", /,/);
   await expect(canvas).toHaveAttribute("data-hit-B", /,/);
   const xyB = await canvas.getAttribute("data-hit-B");
@@ -180,10 +183,14 @@ test("queued tap starts after the current weave commits", async ({ page }) => {
   const [bx, by] = (xyB ?? "0,0").split(",").map(Number);
   const [ax, ay] = (xyA ?? "0,0").split(",").map(Number);
   await canvas.click({ position: { x: bx, y: by } });
-  await expect(canvas).toHaveAttribute("data-busy", "true");
   await canvas.click({ position: { x: ax, y: ay } });
-  await expect(canvas).toHaveAttribute("data-piece-count", "0", { timeout: 4000 });
-  await expect(page.getByTestId("win-card")).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-piece-count", "0", { timeout: 800 });
+  const flying = await canvas.getAttribute("data-flying");
+  expect(flying ?? "").toMatch(/A/);
+  expect(flying ?? "").toMatch(/B/);
+  await expect(canvas).toHaveAttribute("data-ghost-count", "2");
+  await expect(canvas).toHaveAttribute("data-flying", "", { timeout: 3500 });
+  await expect(page.getByTestId("win-card")).toBeVisible({ timeout: 4000 });
 });
 
 test("fit recenters without locking pan", async ({ page }) => {

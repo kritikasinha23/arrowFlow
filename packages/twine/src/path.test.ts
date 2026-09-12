@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   blockedTravelCells,
+  buildGroove,
+  clipHeadingToView,
   dist,
+  FREE_WEAVE_MS_MAX,
+  FREE_WEAVE_MS_MIN,
+  freeWeaveDurationMs,
   headPointAtProgress,
   offBoardTravelCells,
   polylineLength,
+  polylineOutsideRect,
   progressToVisiblePath,
   unweaveStopProgress,
+  viewClearTravelPx,
 } from "./index";
 
 const rest = [
@@ -136,6 +143,71 @@ describe("slide travel", () => {
     expect(blockedTravelCells(1)).toBeCloseTo(1.82, 8);
   });
 });
+
+describe("view-clear travel", () => {
+  const rest = [
+    { x: 40, y: 40 },
+    { x: 80, y: 40 },
+  ];
+  const view = { x: 0, y: 0, w: 200, h: 160 };
+  const pad = 12;
+
+  it("pulls past the view AABB, not only the grid box", () => {
+    const travel = viewClearTravelPx(rest, "right", view, pad);
+    expect(travel).toBeCloseTo(polylineLength(rest) + (view.w + pad - 80), 8);
+    expect(travel).toBeGreaterThan(80);
+  });
+
+  it("keeps the tail on G just before 1, then clears the view at 1", () => {
+    const travel = viewClearTravelPx(rest, "right", view, pad);
+    const groove = buildGroove(rest, "right", travel);
+    const restLen = polylineLength(rest);
+    const mid = progressToVisiblePath(rest, 0.45, "right", travel);
+    expect(polylineOutsideRect(mid, view)).toBe(false);
+
+    const almost = progressToVisiblePath(rest, 0.99, "right", travel);
+    expect(polylineLength(almost)).toBeCloseTo(restLen, 8);
+    const tailOnG = groove.some((p, i) => {
+      if (i === 0) return dist(almost[0], p) < 1e-6;
+      return distToSeg(almost[0], groove[i - 1], p) < 1e-4;
+    });
+    expect(tailOnG).toBe(true);
+
+    const done = progressToVisiblePath(rest, 1, "right", travel);
+    expect(polylineLength(done)).toBeCloseTo(restLen, 8);
+    expect(polylineOutsideRect(done, view)).toBe(true);
+  });
+
+  it("clips a heading ray to the view AABB, past the board edge", () => {
+    const head = { x: 80, y: 40 };
+    expect(clipHeadingToView(head, "right", view)).toEqual({ x: 200, y: 40 });
+    expect(clipHeadingToView(head, "left", view)).toEqual({ x: 0, y: 40 });
+    expect(clipHeadingToView(head, "down", view)).toEqual({ x: 80, y: 160 });
+    expect(clipHeadingToView(head, "up", view)).toEqual({ x: 80, y: 0 });
+  });
+
+  it("scales free-weave duration with span inside 900–1400ms", () => {
+    expect(freeWeaveDurationMs(20, 40)).toBe(FREE_WEAVE_MS_MIN);
+    expect(freeWeaveDurationMs(800, 900)).toBe(FREE_WEAVE_MS_MAX);
+    const mid = freeWeaveDurationMs(120, 400);
+    expect(mid).toBeGreaterThan(FREE_WEAVE_MS_MIN);
+    expect(mid).toBeLessThan(FREE_WEAVE_MS_MAX);
+  });
+});
+
+function distToSeg(
+  p: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return dist(p, a);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return dist(p, { x: a.x + t * dx, y: a.y + t * dy });
+}
 
 describe("unweaveStopProgress", () => {
   it("runs free and blocked clocks to the end of their travel", () => {

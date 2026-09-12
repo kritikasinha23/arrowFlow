@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { clipHeadingToView } from "@arrowflow/twine";
 import { hashDots, headingRays, type RenderArrow, type RenderFrame } from "./board-renderer";
+import { CoordinateMapper } from "./coordinate-mapper";
 
 const start: RenderArrow[] = [
   {
@@ -69,10 +71,13 @@ describe("headingRays", () => {
     },
   ];
 
-  it("clips each remaining arrow at the first foreign occupant", () => {
+  it("continues past the first foreign occupant to the board edge", () => {
     const rays = headingRays(frame(packed));
     expect(rays).toHaveLength(2);
-    expect(rays.find((r) => r.arrowId === "A")?.cells).toEqual([{ row: 1, col: 2 }]);
+    expect(rays.find((r) => r.arrowId === "A")?.cells).toEqual([
+      { row: 1, col: 2 },
+      { row: 1, col: 3 },
+    ]);
     expect(rays.find((r) => r.arrowId === "B")?.cells).toEqual([]);
   });
 
@@ -96,15 +101,33 @@ describe("headingRays", () => {
     ]);
   });
 
-  it("accents selected or blocked-red pieces", () => {
+  it("uses a red ray only when the piece is red", () => {
     const red = packed.map((a) => (a.id === "A" ? { ...a, isRed: true } : a));
     expect(headingRays(frame(red)).find((r) => r.arrowId === "A")?.accent).toBe(true);
-    expect(headingRays(frame(packed, { selectedId: "B" })).find((r) => r.arrowId === "B")?.accent).toBe(true);
+    expect(headingRays(frame(packed, { selectedId: "B" })).find((r) => r.arrowId === "B")?.accent).toBe(false);
     expect(headingRays(frame(packed)).find((r) => r.arrowId === "B")?.accent).toBe(false);
   });
 
   it("skips a hidden in-flight piece", () => {
     const rays = headingRays(frame(packed.map((a) => (a.id === "A" ? { ...a, hidden: true } : a))));
     expect(rays.map((r) => r.arrowId)).toEqual(["B"]);
+  });
+
+  it("skips a free-escape ghost", () => {
+    const rays = headingRays(frame(packed.map((a) => (a.id === "A" ? { ...a, ghost: true } : a))));
+    expect(rays.map((r) => r.arrowId)).toEqual(["B"]);
+  });
+
+  it("clips each heading ray to the canvas view, past the fitted board", () => {
+    const mapper = new CoordinateMapper(4, 4, 400, 700, {
+      content: { minRow: 0, minCol: 0, maxRow: 1, maxCol: 1 },
+    });
+    const ray = headingRays(frame(packed)).find((r) => r.arrowId === "A");
+    expect(ray).toBeTruthy();
+    const from = mapper.cellCenter(ray!.from);
+    const to = clipHeadingToView(from, ray!.direction, { x: 0, y: 0, w: 400, h: 700 });
+    expect(to.x).toBeCloseTo(400, 5);
+    expect(to.y).toBeCloseTo(from.y, 5);
+    expect(to.x).toBeGreaterThan(mapper.contentBox.x + mapper.contentBox.w);
   });
 });

@@ -5,20 +5,33 @@ import {
   CoordinateMapper,
   FIT_VIEW,
   TAP_SLOP_PX,
+  TAP_FX_MS,
+  WIN_CARD_AFTER_MS,
+  WIN_FX_MS,
   boardBounds,
   clampPan,
   headingRays,
   latticeCells,
   linesAreOn,
   occupiedBounds,
+  seedConfetti,
+  seedTapConfetti,
   viewIsFit,
   zoomAround,
   type ContentBox,
   type LinesMode,
   type RenderArrow,
   type ViewTransform,
+  type WinFx,
 } from "@arrowflow/renderer";
-import { createWeaveTicker, unweaveStopProgress } from "@arrowflow/twine";
+import {
+  VIEW_CLEAR_PAD_PX,
+  createWeaveTicker,
+  freeWeaveDurationMs,
+  polylineLength,
+  unweaveStopProgress,
+  viewClearTravelPx,
+} from "@arrowflow/twine";
 import { IconBack, IconHash, IconHeart, IconSpark, IconUndo } from "../chrome/icons";
 import { getBoard, UnknownLevelError } from "../boards";
 import { PuzzleEngine, type ArrowModel } from "../engine-bridge";
@@ -33,35 +46,62 @@ import {
   setLinesMode,
   utcStamp,
 } from "../storage";
-import { IDLE_WEAVE, acceptTap, takeQueued, type WeaveLock } from "../weave-queue";
+import { acceptTap } from "../weave-queue";
 
-type Anim = {
+type FlightAnim = {
   id: string;
   trim: number;
   kind: "free" | "blocked";
   rayIndex: number;
+  ghost?: RenderArrow;
+  cancel: () => void;
 };
 
 type Ptr = { id: number; x: number; y: number };
 
+function snapshotGhost(a: ArrowModel): RenderArrow {
+  return {
+    id: a.id,
+    cells: a.cells.map((c) => ({ row: c.row, col: c.col })),
+    direction: a.direction,
+    headCell: { row: a.headCell.row, col: a.headCell.col },
+    isRed: a.isRed,
+    ghost: true,
+  };
+}
+
 function toRender(
   arrows: ArrowModel[],
-  anim: Anim | null,
+  flights: Map<string, FlightAnim>,
   hintId: string | null,
   pulse: number,
 ): RenderArrow[] {
-  return arrows.map((a) => ({
-    id: a.id,
-    cells: a.cells,
-    direction: a.direction,
-    headCell: a.headCell,
-    isRed: a.isRed,
-    rayIndex: anim?.id === a.id ? anim.rayIndex : 0,
-    animKind: anim?.id === a.id ? anim.kind : undefined,
-    hidden: anim?.id === a.id && anim.kind === "free" && anim.trim >= 0.999,
-    trim: anim?.id === a.id ? anim.trim : 0,
-    pulse: hintId === a.id ? pulse : 0,
-  }));
+  const out: RenderArrow[] = arrows.map((a) => {
+    const anim = flights.get(a.id);
+    return {
+      id: a.id,
+      cells: a.cells,
+      direction: a.direction,
+      headCell: a.headCell,
+      isRed: a.isRed,
+      rayIndex: anim?.rayIndex ?? 0,
+      animKind: anim?.kind,
+      trim: anim?.trim ?? 0,
+      pulse: hintId === a.id ? pulse : 0,
+    };
+  });
+  for (const anim of flights.values()) {
+    if (anim.kind !== "free" || !anim.ghost) continue;
+    if (arrows.some((a) => a.id === anim.id)) continue;
+    out.push({
+      ...anim.ghost,
+      trim: anim.trim,
+      animKind: "free",
+      rayIndex: anim.rayIndex,
+      ghost: true,
+    });
+  }
+  return out;
 }
 
 function Heart({ on }: { on: boolean }) {
@@ -76,8 +116,13 @@ export function Play() {
   const engineRef = useRef<PuzzleEngine | null>(null);
   const rendererRef = useRef<BoardRenderer | null>(null);
   const mapperRef = useRef<CoordinateMapper | null>(null);
-  const animRef = useRef<Anim | null>(null);
-  const cancelRef = useRef<{ cancel: () => void } | null>(null);
+  const flightsRef = useRef<Map<string, FlightAnim>>(new Map());
+  const winFxRef = useRef<WinFx | null>(null);
+  const winFxRafRef = useRef(0);
+  const winFxStartedRef = useRef(false);
+  const tapFxRef = useRef<Array<WinFx & { startedAt: number }>>([]);
+  const tapFxRafRef = useRef(0);
+  const lastExitRef = useRef<{ x: number; y: number } | null>(null);
   const hintRef = useRef<string | null>(null);
   const pulseRef = useRef(0);
   const viewRef = useRef<ViewTransform>({ ...FIT_VIEW });
@@ -106,8 +151,9 @@ export function Play() {
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const [hearts, setHearts] = useState(3);
-  const [busy, setBusy] = useState(false);
+  const [flightCount, setFlightCount] = useState(0);
   const [won, setWon] = useState(false);
+  const [showWinCard, setShowWinCard] = useState(false);
   const [failed, setFailed] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const [lines, setLines] = useState<LinesMode>(getLinesMode);
@@ -124,8 +170,6 @@ export function Play() {
   const [viewTick, setViewTick] = useState(0);
   const linesRef = useRef(lines);
   const selectedRef = useRef(selectedId);
-  const lockRef = useRef<WeaveLock>(IDLE_WEAVE);
-  const startWeaveRef = useRef<(id: string) => void>(() => {});
   linesRef.current = lines;
   selectedRef.current = selectedId;
 
@@ -196,7 +240,7 @@ export function Play() {
     });
     mapperRef.current = mapper;
     contentBoxRef.current = mapper.contentBox;
-    const arrows = toRender(engine.board.arrows, animRef.current, hintRef.current, pulseRef.current);
+    const arrows = toRender(engine.board.arrows, flightsRef.current, hintRef.current, pulseRef.current);
     const frame = {
       boardW: engine.board.width,
       boardH: engine.board.height,
@@ -206,6 +250,8 @@ export function Play() {
       hintId: hintRef.current,
       hintPulse: pulseRef.current,
       selectedId: selectedRef.current,
+      winFx: winFxRef.current,
+      tapFx: tapFxRef.current,
     };
     renderer.draw(mapper, frame, dpr);
     for (const key of [...canvas.attributes].map((a) => a.name)) {
@@ -216,7 +262,15 @@ export function Play() {
       "data-ray-count",
       String(linesAreOn(frame.lines) ? headingRays(frame).length : 0),
     );
-    canvas.setAttribute("data-pending", lockRef.current.pendingId ?? "");
+    canvas.setAttribute("data-pending", "");
+    canvas.setAttribute("data-flying", [...flightsRef.current.keys()].join(","));
+    canvas.setAttribute(
+      "data-ghost-count",
+      String([...flightsRef.current.values()].filter((f) => f.kind === "free").length),
+    );
+    canvas.setAttribute("data-win-fx", winFxRef.current ? "true" : "false");
+    canvas.setAttribute("data-tap-fx", tapFxRef.current.length ? "true" : "false");
+    canvas.setAttribute("data-busy", flightsRef.current.size > 0 ? "true" : "false");
     canvas.setAttribute(
       "data-bounds",
       `${bounds.minRow},${bounds.minCol},${bounds.maxRow},${bounds.maxCol}`,
@@ -229,11 +283,27 @@ export function Play() {
     }
   }, []);
 
+  const cancelFlights = useCallback(() => {
+    for (const flight of flightsRef.current.values()) flight.cancel();
+    flightsRef.current.clear();
+    setFlightCount(0);
+  }, []);
+
+  const cancelWinFx = useCallback(() => {
+    if (winFxRafRef.current) cancelAnimationFrame(winFxRafRef.current);
+    winFxRafRef.current = 0;
+    winFxRef.current = null;
+    winFxStartedRef.current = false;
+    lastExitRef.current = null;
+    if (tapFxRafRef.current) cancelAnimationFrame(tapFxRafRef.current);
+    tapFxRafRef.current = 0;
+    tapFxRef.current = [];
+  }, []);
+
   const boot = useCallback(() => {
-    cancelRef.current?.cancel();
-    cancelRef.current = null;
-    animRef.current = null;
-    lockRef.current = IDLE_WEAVE;
+    cancelFlights();
+    cancelWinFx();
+    setShowWinCard(false);
     hintRef.current = null;
     viewRef.current = { ...FIT_VIEW };
     contentBoxRef.current = null;
@@ -254,18 +324,16 @@ export function Play() {
       setUnavailable(false);
       setFailed(false);
       setWon(false);
-      setBusy(false);
       setSelectedId(null);
       syncHud();
       requestAnimationFrame(paint);
     } catch (error) {
       engineRef.current = null;
       setUnavailable(error instanceof UnknownLevelError);
-      setBusy(false);
       setWon(false);
       setFailed(false);
     }
-  }, [levelId, playMode, syncHud, paint]);
+  }, [levelId, playMode, syncHud, paint, cancelFlights, cancelWinFx]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -282,13 +350,14 @@ export function Play() {
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", onResize);
-      cancelRef.current?.cancel();
+      cancelFlights();
+      cancelWinFx();
     };
-  }, [levelId, playMode, boot, paint]);
+  }, [levelId, playMode, boot, paint, cancelFlights, cancelWinFx]);
 
   useEffect(() => {
     paint();
-  }, [lines, paint, hearts, pieceCount, redIds, won, selectedId, viewTick]);
+  }, [lines, paint, hearts, pieceCount, redIds, won, selectedId, viewTick, flightCount, showWinCard]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -318,7 +387,7 @@ export function Play() {
 
   const onHint = () => {
     const engine = engineRef.current;
-    if (!engine || busy) return;
+    if (!engine || engine.isWon) return;
     const ids = engine.availableArrows();
     hintRef.current = ids[0] ?? null;
     if (!hintRef.current) return;
@@ -337,71 +406,152 @@ export function Play() {
     requestAnimationFrame(tick);
   };
 
+  const startWinFx = useCallback(() => {
+    if (winFxStartedRef.current) return;
+    winFxStartedRef.current = true;
+    const mapper = mapperRef.current;
+    const origin = lastExitRef.current ?? {
+      x: (mapper?.cssWidth ?? 200) / 2,
+      y: (mapper?.cssHeight ?? 400) / 2,
+    };
+    winFxRef.current = { t: 0, origin, bits: seedConfetti(origin), durationMs: WIN_FX_MS };
+    const t0 = performance.now();
+    const tick = (now: number) => {
+      if (!winFxRef.current) return;
+      const elapsed = now - t0;
+      winFxRef.current.t = Math.min(1, elapsed / WIN_FX_MS);
+      if (elapsed >= WIN_CARD_AFTER_MS) setShowWinCard(true);
+      paint();
+      if (elapsed < WIN_FX_MS) {
+        winFxRafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      winFxRef.current = null;
+      paint();
+    };
+    winFxRafRef.current = requestAnimationFrame(tick);
+  }, [paint]);
+
+  const spawnTapConfetti = useCallback(
+    (origin: { x: number; y: number }) => {
+      tapFxRef.current.push({
+        t: 0,
+        origin,
+        bits: seedTapConfetti(origin, (performance.now() * 1000) | 0),
+        durationMs: TAP_FX_MS,
+        startedAt: performance.now(),
+      });
+      if (tapFxRafRef.current) return;
+      const tick = (now: number) => {
+        tapFxRef.current = tapFxRef.current.filter((fx) => {
+          fx.t = Math.min(1, (now - fx.startedAt) / (fx.durationMs ?? TAP_FX_MS));
+          return fx.t < 1;
+        });
+        paint();
+        if (tapFxRef.current.length) {
+          tapFxRafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        tapFxRafRef.current = 0;
+      };
+      tapFxRafRef.current = requestAnimationFrame(tick);
+    },
+    [paint],
+  );
+
   const startWeave = useCallback(
-    (id: string) => {
+    (id: string, tap?: { x: number; y: number }) => {
       const engine = engineRef.current;
-      const canvas = canvasRef.current;
-      if (!engine || engine.isWon || engine.isOutOfHearts) return;
-      if (!engine.board.arrows.some((a) => a.id === id)) return;
+      if (!engine || engine.isOutOfHearts) return;
+      if (flightsRef.current.has(id)) return;
+      const arrow = engine.board.arrows.find((a) => a.id === id);
+      if (!arrow) return;
       const result = engine.tryWeave(id);
       const rayIndex = result.kind === "blocked" ? result.rayIndex : 0;
       const stop = unweaveStopProgress(result.kind);
+      const mapper = mapperRef.current;
+      const renderer = rendererRef.current;
+      let durationMs: number | undefined;
+      let ghost: RenderArrow | undefined;
+      if (result.kind === "free") {
+        ghost = snapshotGhost(arrow);
+        if (mapper && renderer) {
+          const rest = renderer.restPoints(mapper, arrow);
+          const travel = viewClearTravelPx(
+            rest,
+            arrow.direction,
+            { x: 0, y: 0, w: mapper.cssWidth, h: mapper.cssHeight },
+            VIEW_CLEAR_PAD_PX,
+          );
+          durationMs = freeWeaveDurationMs(polylineLength(rest), travel);
+          lastExitRef.current = mapper.cellCenter(arrow.headCell);
+        }
+        const blastAt = tap ?? lastExitRef.current ?? { x: 0, y: 0 };
+        spawnTapConfetti(blastAt);
+        engine.commitFree(id);
+        moveLogRef.current.push({
+          arrowId: id,
+          tMs: Math.max(0, Date.now() - startedAtRef.current),
+          result: "free",
+        });
+        syncHud();
+      }
       setSelectedId(id);
-      setBusy(true);
-      if (canvas) canvas.dataset.busy = "true";
       hintRef.current = null;
-      animRef.current = { id, trim: 0, kind: result.kind, rayIndex };
+      const flight: FlightAnim = {
+        id,
+        trim: 0,
+        kind: result.kind,
+        rayIndex,
+        ghost,
+        cancel: () => {},
+      };
+      flightsRef.current.set(id, flight);
+      setFlightCount(flightsRef.current.size);
       paint();
-      cancelRef.current = createWeaveTicker(
+      const ticker = createWeaveTicker(
         result.kind,
         stop,
         (frame) => {
-          animRef.current = { id, trim: frame.trim, kind: result.kind, rayIndex };
+          const cur = flightsRef.current.get(id);
+          if (!cur) return;
+          cur.trim = frame.trim;
           paint();
         },
         () => {
-          animRef.current = null;
-          if (result.kind === "free") engine.commitFree(id);
-          else engine.commitBlocked(id);
-          moveLogRef.current.push({
-            arrowId: id,
-            tMs: Math.max(0, Date.now() - startedAtRef.current),
-            result: result.kind,
-          });
-          const next = takeQueued(lockRef.current, (qid) =>
-            engine.board.arrows.some((a) => a.id === qid),
-          );
-          lockRef.current = next.lock;
-          syncHud();
-          if (next.startId) {
-            paint();
-            startWeaveRef.current(next.startId);
-            return;
+          const cur = flightsRef.current.get(id);
+          if (cur) flightsRef.current.delete(id);
+          setFlightCount(flightsRef.current.size);
+          if (result.kind === "blocked") {
+            engine.commitBlocked(id);
+            moveLogRef.current.push({
+              arrowId: id,
+              tMs: Math.max(0, Date.now() - startedAtRef.current),
+              result: "blocked",
+            });
+            syncHud();
           }
-          setBusy(false);
-          if (canvas) canvas.dataset.busy = "false";
+          const ghostsLeft = [...flightsRef.current.values()].some((f) => f.kind === "free");
+          if (engine.isWon && !ghostsLeft) startWinFx();
           paint();
         },
+        { durationMs },
       );
+      flight.cancel = ticker.cancel;
     },
-    [paint, syncHud],
+    [paint, syncHud, startWinFx, spawnTapConfetti],
   );
-  startWeaveRef.current = startWeave;
 
   const onTap = (cssX: number, cssY: number) => {
     const engine = engineRef.current;
     const mapper = mapperRef.current;
     const renderer = rendererRef.current;
-    if (!engine || !mapper || !renderer || engine.isWon || engine.isOutOfHearts) return;
-    const arrows = toRender(engine.board.arrows, null, null, 0);
+    if (!engine || !mapper || !renderer || engine.isOutOfHearts) return;
+    const arrows = toRender(engine.board.arrows, new Map(), null, 0);
     const id = renderer.hitTest(mapper, arrows, cssX, cssY);
-    const decision = acceptTap(lockRef.current, id);
-    lockRef.current = decision.lock;
-    if (decision.action === "queue") {
-      paint();
-      return;
+    if (acceptTap([...flightsRef.current.values()], id).action === "start" && id) {
+      startWeave(id, { x: cssX, y: cssY });
     }
-    if (decision.action === "start" && id) startWeave(id);
   };
 
   const localPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -506,7 +656,7 @@ export function Play() {
     const renderer = rendererRef.current;
     const engine = engineRef.current;
     if (!mapper || !renderer || !engine) return;
-    const arrows = toRender(engine.board.arrows, null, null, 0);
+    const arrows = toRender(engine.board.arrows, new Map(), null, 0);
     const hit = renderer.hitTest(mapper, arrows, p.x, p.y);
     if (
       !hit &&
@@ -525,14 +675,17 @@ export function Play() {
   };
 
   const onUndo = () => {
-    if (busy || won) return;
+    if (showWinCard || engineRef.current?.isWon) return;
+    cancelFlights();
     engineRef.current?.undo();
     syncHud();
     paint();
   };
 
   const onReset = () => {
-    if (busy) return;
+    if (showWinCard) return;
+    cancelFlights();
+    cancelWinFx();
     engineRef.current?.reset();
     startCountRef.current = engineRef.current?.board.arrows.length ?? 0;
     syncHud();
@@ -563,7 +716,7 @@ export function Play() {
   const fit = viewIsFit(viewRef.current);
   const startCount = startCountRef.current || Math.max(pieceCount, 1);
   const cleared = Math.max(0, startCount - pieceCount);
-  const progress = won ? 1 : cleared / startCount;
+  const progress = won || showWinCard ? 1 : cleared / startCount;
   const campaignMode = playMode !== "daily" && playMode !== "league";
   const nextId = campaignMode ? nextCampaignLevelId(levelLabel) : null;
 
@@ -600,7 +753,7 @@ export function Play() {
             data-testid="btn-undo"
             aria-label="Undo"
             title="Undo · hold to reset"
-            disabled={busy || won}
+            disabled={showWinCard || won}
             onClick={onUndo}
             onPointerDown={onUndoHoldStart}
             onPointerUp={onUndoHoldEnd}
@@ -609,7 +762,7 @@ export function Play() {
           >
             <IconUndo />
           </button>
-          <button type="button" className="sr-only" data-testid="btn-reset" onClick={onReset} disabled={busy}>
+          <button type="button" className="sr-only" data-testid="btn-reset" onClick={onReset} disabled={showWinCard}>
             Reset
           </button>
         </div>
@@ -619,7 +772,7 @@ export function Play() {
           ))}
         </div>
         <div className="hud-right">
-          <button type="button" className="hint-pill" data-testid="btn-hint" onClick={onHint} disabled={busy}>
+          <button type="button" className="hint-pill" data-testid="btn-hint" onClick={onHint} disabled={won || showWinCard}>
             <IconSpark />
             Hint
           </button>
@@ -637,11 +790,11 @@ export function Play() {
           ref={canvasRef}
           className="board"
           data-testid="board-canvas"
-          data-busy={busy ? "true" : "false"}
+          data-busy={flightCount > 0 ? "true" : "false"}
           data-red={redIds.join(",")}
           data-piece-count={pieceCount}
           data-lines={lines}
-          data-won={won ? "true" : "false"}
+          data-won={won || showWinCard ? "true" : "false"}
           data-scale={viewRef.current.scale.toFixed(2)}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -677,7 +830,7 @@ export function Play() {
         </button>
       </div>
 
-      {won ? (
+      {showWinCard ? (
         <aside className="win-card" data-testid="win-card" data-won="true">
           <p>Board clear</p>
           <div className="win-card-actions">

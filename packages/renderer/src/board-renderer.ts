@@ -1,8 +1,10 @@
 import {
   HIT_WIDTH_PX,
   STROKE_WIDTH_PX,
+  VIEW_CLEAR_PAD_PX,
   buildRoundedStroke,
   cellCenters,
+  clipHeadingToView,
   drawTriangleHead,
   exitRayCells,
   headPointAtProgress,
@@ -12,8 +14,10 @@ import {
   type Direction,
   type GridPoint,
   type Point,
+  type ViewRect,
   type WeaveAnimKind,
 } from "@arrowflow/twine";
+import { drawConfetti, latticeRipple, type WinFx } from "./celebration";
 import { CoordinateMapper, linesAreOn, type LinesMode } from "./coordinate-mapper";
 import { occupiedCells } from "./vacant";
 
@@ -30,6 +34,8 @@ export type RenderArrow = {
   trim?: number;
   hidden?: boolean;
   pulse?: number;
+  /** Visual-only escape stroke; excluded from occupancy rays and hit-tests. */
+  ghost?: boolean;
 };
 
 export type RenderFrame = {
@@ -42,12 +48,15 @@ export type RenderFrame = {
   hintId?: string | null;
   hintPulse?: number;
   selectedId?: string | null;
+  winFx?: WinFx | null;
+  tapFx?: WinFx[];
 };
 
 export type HeadingRay = {
   arrowId: string;
   from: GridPoint;
   cells: GridPoint[];
+  direction: Direction;
   accent: boolean;
 };
 
@@ -56,45 +65,35 @@ export function hashDots(frame: RenderFrame): GridPoint[] {
   return occupiedCells(frame.lattice ?? frame.arrows.flatMap((a) => a.cells));
 }
 
-function cellKey(cell: GridPoint): string {
-  return `${cell.row},${cell.col}`;
-}
-
 /**
- * Heading ray per remaining arrow along `exitRay`. Stops at the first foreign
- * occupant (inclusive) or the declared board edge.
+ * Heading ray per remaining arrow. Cells list the on-board heading walk (does
+ * not stop at the first occupant). The draw path continues to the view AABB.
  */
 export function headingRays(frame: RenderFrame): HeadingRay[] {
-  const occ = new Map<string, string>();
-  for (const arrow of frame.arrows) {
-    if (arrow.hidden) continue;
-    for (const cell of arrow.cells) occ.set(cellKey(cell), arrow.id);
-  }
   const rays: HeadingRay[] = [];
   for (const arrow of frame.arrows) {
-    if (arrow.hidden) continue;
-    const raw = exitRayCells(arrow.headCell, arrow.direction, frame.boardW, frame.boardH);
-    const cells: GridPoint[] = [];
-    for (const cell of raw) {
-      cells.push(cell);
-      const occupant = occ.get(cellKey(cell));
-      if (occupant && occupant !== arrow.id) break;
-    }
+    if (arrow.hidden || arrow.ghost) continue;
     rays.push({
       arrowId: arrow.id,
       from: { row: arrow.headCell.row, col: arrow.headCell.col },
-      cells,
-      accent: arrow.isRed || arrow.animKind === "blocked" || frame.selectedId === arrow.id,
+      cells: exitRayCells(arrow.headCell, arrow.direction, frame.boardW, frame.boardH),
+      direction: arrow.direction,
+      accent: arrow.isRed,
     });
   }
   return rays;
+}
+
+function mapperViewRect(mapper: CoordinateMapper): ViewRect {
+  return { x: 0, y: 0, w: mapper.cssWidth, h: mapper.cssHeight };
 }
 
 const INK = "#16161f";
 const RED = "#ff3b4e";
 const PAPER = "#ffffff";
 const DOT = "#c8cad6";
-const TICK = "rgba(160, 164, 184, 0.35)";
+const RAY = "124, 118, 168";
+const RAY_RED = "255, 59, 78";
 
 function hatchPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
   const c = document.createElement("canvas");
@@ -130,12 +129,14 @@ export class BoardRenderer {
       if (arrow.hidden) continue;
       this.drawArrow(mapper, arrow, frame);
     }
+    if (frame.winFx) drawConfetti(this.ctx, frame.winFx);
+    for (const tap of frame.tapFx ?? []) drawConfetti(this.ctx, tap);
   }
 
   hitTest(mapper: CoordinateMapper, arrows: RenderArrow[], x: number, y: number): string | null {
     for (let i = arrows.length - 1; i >= 0; i--) {
       const arrow = arrows[i];
-      if (arrow.hidden) continue;
+      if (arrow.hidden || arrow.ghost) continue;
       const pts = this.restPoints(mapper, arrow);
       if (hitTestFatPolyline(pts, x, y, HIT_WIDTH_PX)) return arrow.id;
     }
@@ -157,40 +158,41 @@ export class BoardRenderer {
     const r = Math.max(1.15, mapper.screenCell * 0.045);
     ctx.save();
     ctx.fillStyle = DOT;
+    const fx = frame.winFx;
     for (const cell of dots) {
       const p = mapper.cellCenter(cell);
+      const ripple = fx ? latticeRipple(fx.origin, p, fx.t, r) : { r, alpha: 1 };
+      ctx.globalAlpha = ripple.alpha;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, ripple.r, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.globalAlpha = 1;
     if (linesAreOn(frame.lines)) this.drawHeadingRays(mapper, frame);
     ctx.restore();
   }
 
   private drawHeadingRays(mapper: CoordinateMapper, frame: RenderFrame): void {
     const ctx = this.ctx;
-    const r = Math.max(1.05, mapper.screenCell * 0.038);
+    const view = mapperViewRect(mapper);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.lineWidth = Math.max(1, mapper.screenCell * 0.035);
-    ctx.setLineDash([2.1, 5.4]);
+    ctx.lineWidth = STROKE_WIDTH_PX;
     for (const ray of headingRays(frame)) {
-      const pts = [mapper.cellCenter(ray.from), ...ray.cells.map((cell) => mapper.cellCenter(cell))];
-      if (pts.length < 2) continue;
-      ctx.strokeStyle = ray.accent ? "rgba(255, 59, 78, 0.42)" : TICK;
+      const from = mapper.cellCenter(ray.from);
+      const to = clipHeadingToView(from, ray.direction, view);
+      if (Math.hypot(to.x - from.x, to.y - from.y) < 2) continue;
+      const rgb = ray.accent ? RAY_RED : RAY;
+      const grad = ctx.createLinearGradient(from.x, from.y, to.x, to.y);
+      grad.addColorStop(0, `rgba(${rgb}, 0.42)`);
+      grad.addColorStop(0.55, `rgba(${rgb}, 0.22)`);
+      grad.addColorStop(1, `rgba(${rgb}, 0.06)`);
+      ctx.strokeStyle = grad;
       ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
       ctx.stroke();
-      ctx.fillStyle = ray.accent ? "rgba(255, 59, 78, 0.38)" : DOT;
-      for (const cell of ray.cells) {
-        const p = mapper.cellCenter(cell);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
     }
-    ctx.setLineDash([]);
   }
 
   private drawArrow(mapper: CoordinateMapper, arrow: RenderArrow, frame: RenderFrame): void {
@@ -208,7 +210,9 @@ export class BoardRenderer {
             height: frame.boardH,
             cellSize: mapper.screenCell,
             rayIndex: arrow.rayIndex ?? 0,
-            bounds: mapper.content,
+            rest,
+            view: mapperViewRect(mapper),
+            pad: VIEW_CLEAR_PAD_PX,
           });
     const visible = progressToVisiblePath(rest, trim, arrow.direction, travel);
     if (visible.length === 0) return;

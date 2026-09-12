@@ -74,6 +74,14 @@ function boardBox(bounds: BoardBox): { minRow: number; minCol: number; maxRow: n
   };
 }
 
+export type ViewRect = { x: number; y: number; w: number; h: number };
+
+/** Extra px past the view AABB so the stroke + cap fully leave the clip. */
+export const VIEW_CLEAR_PAD_PX = 18;
+
+export const FREE_WEAVE_MS_MIN = 900;
+export const FREE_WEAVE_MS_MAX = 1400;
+
 /** Cells the head must travel along heading to clear the fitted AABB. */
 export function headingClearCells(
   head: GridPoint,
@@ -113,6 +121,77 @@ export function offBoardTravelCells(
   return restCells + headingClearCells(head, direction, widthOrBounds, height);
 }
 
+/** Distance from `head` along heading to the far side of `view` plus pad. */
+export function headingClearPx(
+  head: Point,
+  direction: Direction,
+  view: ViewRect,
+  pad = VIEW_CLEAR_PAD_PX,
+): number {
+  switch (direction) {
+    case "right":
+      return Math.max(1, view.x + view.w + pad - head.x);
+    case "left":
+      return Math.max(1, head.x - view.x + pad);
+    case "down":
+      return Math.max(1, view.y + view.h + pad - head.y);
+    case "up":
+      return Math.max(1, head.y - view.y + pad);
+  }
+}
+
+/**
+ * Groove travel so the constant-length window (tail included) leaves `view`.
+ * L along G, then heading clearance to the view AABB + pad — not the grid box.
+ */
+export function viewClearTravelPx(
+  rest: Point[],
+  direction: Direction,
+  view: ViewRect,
+  pad = VIEW_CLEAR_PAD_PX,
+): number {
+  if (rest.length === 0) return 1;
+  const head = rest[rest.length - 1];
+  const restLen = Math.max(1, polylineLength(rest));
+  return restLen + headingClearPx(head, direction, view, pad);
+}
+
+/** Far-edge clip of a heading ray against the current view/canvas AABB. */
+export function clipHeadingToView(head: Point, direction: Direction, view: ViewRect): Point {
+  const d = headingUnit(direction);
+  const x0 = view.x;
+  const y0 = view.y;
+  const x1 = view.x + view.w;
+  const y1 = view.y + view.h;
+  let t = Infinity;
+  if (d.x > 0) t = Math.min(t, (x1 - head.x) / d.x);
+  else if (d.x < 0) t = Math.min(t, (x0 - head.x) / d.x);
+  if (d.y > 0) t = Math.min(t, (y1 - head.y) / d.y);
+  else if (d.y < 0) t = Math.min(t, (y0 - head.y) / d.y);
+  if (!Number.isFinite(t) || t <= 0) return { x: head.x, y: head.y };
+  return { x: head.x + d.x * t, y: head.y + d.y * t };
+}
+
+export function pointInRect(p: Point, view: ViewRect, pad = 0): boolean {
+  return (
+    p.x >= view.x - pad &&
+    p.x <= view.x + view.w + pad &&
+    p.y >= view.y - pad &&
+    p.y <= view.y + view.h + pad
+  );
+}
+
+export function polylineOutsideRect(points: Point[], view: ViewRect, pad = 0): boolean {
+  return points.length === 0 || points.every((p) => !pointInRect(p, view, pad));
+}
+
+/** Ease-in-out free exit: longer pieces / farther view clearance take longer. */
+export function freeWeaveDurationMs(restLen: number, travel: number): number {
+  const span = Math.max(0, restLen) + Math.max(0, travel);
+  const u = Math.max(0, Math.min(1, (span - 120) / 1400));
+  return Math.round(FREE_WEAVE_MS_MIN + (FREE_WEAVE_MS_MAX - FREE_WEAVE_MS_MIN) * u);
+}
+
 /** Cells to slide the head until it kisses the first foreign ray cell. */
 export function blockedTravelCells(rayIndex: number): number {
   return Math.max(0.4, Math.max(0, rayIndex) + 0.82);
@@ -127,12 +206,23 @@ export function slideTravelPx(args: {
   cellSize: number;
   rayIndex?: number;
   bounds?: BoardBox;
+  rest?: Point[];
+  view?: ViewRect;
+  pad?: number;
 }): number {
-  const cells =
-    args.kind === "blocked"
-      ? blockedTravelCells(args.rayIndex ?? 0)
-      : offBoardTravelCells(args.cells, args.direction, args.bounds ?? { width: args.width, height: args.height });
-  return cells * args.cellSize;
+  if (args.kind === "blocked") {
+    return blockedTravelCells(args.rayIndex ?? 0) * args.cellSize;
+  }
+  if (args.rest && args.view) {
+    return viewClearTravelPx(args.rest, args.direction, args.view, args.pad);
+  }
+  return (
+    offBoardTravelCells(
+      args.cells,
+      args.direction,
+      args.bounds ?? { width: args.width, height: args.height },
+    ) * args.cellSize
+  );
 }
 
 export function extendOffboard(
@@ -402,7 +492,7 @@ const easeAnticipate = (t: number): number => {
 };
 
 export const PRESETS: Record<WeavePresetName, WeavePreset> = {
-  WeaveFree: { name: "WeaveFree", durationMs: 700, reverseMs: 0, ease: easeAnticipate },
+  WeaveFree: { name: "WeaveFree", durationMs: 1100, reverseMs: 0, ease: easeInOut },
   WeaveBlocked: { name: "WeaveBlocked", durationMs: 480, reverseMs: 320, ease: easeInOut },
   HeartLoss: { name: "HeartLoss", durationMs: 220, reverseMs: 0, ease: easeOut },
   UndoRestore: { name: "UndoRestore", durationMs: 180, reverseMs: 0, ease: easeInOut },
@@ -431,7 +521,7 @@ export function presetDuration(preset: WeavePreset): { go: number; back: number 
 }
 
 /**
- * Thread-window along G. Free: 0→1 (~600–800ms), then commit.
+ * Thread-window along G. Free: 0→1 (900–1400ms, view-clear travel), then commit.
  * Blocked: pull toward the first foreign cell, reverse to rest, then commit.
  */
 export function createWeaveTicker(
@@ -439,9 +529,14 @@ export function createWeaveTicker(
   progressStop: number,
   onFrame: (state: Omit<WeaveAnimState, "id">) => void,
   onDone: () => void,
+  opts?: { durationMs?: number },
 ): { cancel: () => void } {
   const preset = kind === "free" ? PRESETS.WeaveFree : PRESETS.WeaveBlocked;
-  const { go, back } = presetDuration(preset);
+  const durationMs =
+    kind === "free" && opts?.durationMs != null
+      ? Math.min(FREE_WEAVE_MS_MAX, Math.max(FREE_WEAVE_MS_MIN, opts.durationMs))
+      : preset.durationMs;
+  const { go, back } = presetDuration({ ...preset, durationMs });
   const stop = kind === "free" ? 1 : Math.max(0.12, Math.min(1, progressStop));
   let raf = 0;
   let cancelled = false;
