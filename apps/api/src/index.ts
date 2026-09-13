@@ -9,6 +9,7 @@ if (!globalThis.fetch) {
 
 const sqlitePath = defaultSqlitePath();
 const port = Number(process.env.PORT ?? 8787);
+const host = process.env.HOST ?? "0.0.0.0";
 
 const db = openDatabase(sqlitePath);
 const app = createApp({ db });
@@ -38,6 +39,6 @@ const server = createServer(async (req, res) => {
   res.end(buf);
 });
 
-server.listen(port, "127.0.0.1", () => {
-  process.stdout.write(`ArrowFlow API http://127.0.0.1:${port}  sqlite=${sqlitePath}\n`);
+server.listen(port, host, () => {
+  process.stdout.write(`ArrowFlow API http://${host}:${port}  sqlite=${sqlitePath}\n`);
 });

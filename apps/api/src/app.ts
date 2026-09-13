@@ -166,12 +166,17 @@ export function createApp(opts: { db: Database.Database; clock?: () => Date }) {
   app.use(
     "*",
     cors({
-      origin: [
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://127.0.0.1:4173",
-        "http://localhost:4173",
-      ],
+      origin: (origin) => {
+        if (
+          origin &&
+          /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+):\d+$/.test(
+            origin,
+          )
+        ) {
+          return origin;
+        }
+        return "";
+      },
       allowHeaders: ["Authorization", "Content-Type"],
       allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
     }),

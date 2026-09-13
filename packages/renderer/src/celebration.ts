@@ -2,13 +2,14 @@ import type { Point } from "@arrowflow/twine";
 
 export const WIN_FX_MS = 2400;
 export const WIN_CARD_AFTER_MS = 560;
-export const TAP_FX_MS = 500;
+/** Same clock as the clear party so the tap blast is not cut off. */
+export const TAP_FX_MS = WIN_FX_MS;
 /** Level-clear party: three staggered bursts. */
 export const WIN_CONFETTI_COUNT = 108;
-/** Post-win canvas tap: one burst, ~⅓ fewer bits than clear. */
-export const TAP_CONFETTI_COUNT = 72;
-/** Slightly slower than the clear burst so a tap reads as a smaller pop. */
-export const TAP_SPEED_SCALE = 0.85;
+/** Post-win canvas tap: one burst, fewer bits. */
+export const TAP_CONFETTI_COUNT = 36;
+/** Faster launch than the clear burst; same 2.4s lifetime. */
+export const TAP_SPEED_SCALE = 1.2;
 
 /** Constant ripple speed in CSS/world pixels — not a fraction of max radius. */
 export const RIPPLE_SPEED_PX_S = 230;
@@ -86,7 +87,7 @@ export function seedConfetti(
       x: origin.x + ox,
       y: origin.y + oy,
       vx: Math.cos(ang) * spd,
-      vy: Math.sin(ang) * spd - 80 - rand() * 90,
+      vy: Math.sin(ang) * spd - (80 + rand() * 90) * speedScale,
       rot: rand() * Math.PI,
       vr: (rand() - 0.5) * 10,
       w: 3.2 + rand() * 5.2,
@@ -136,15 +137,17 @@ export function latticeRipple(
 }
 
 export function drawConfetti(ctx: CanvasRenderingContext2D, fx: WinFx): void {
-  const durationSec = (fx.durationMs ?? WIN_FX_MS) / 1000;
-  const elapsed = Math.max(0, Math.min(1, fx.t)) * durationSec;
+  const lifetimeSec = (fx.durationMs ?? WIN_FX_MS) / 1000;
+  const elapsed = Math.max(0, Math.min(1, fx.t)) * lifetimeSec;
+  const physicsSec = WIN_FX_MS / 1000;
   const g = 420;
   for (const bit of fx.bits) {
     const localSec = elapsed - bit.delay;
     if (localSec <= 0) continue;
-    const localT = localSec / durationSec;
-    if (localT >= 1) continue;
-    const fade = localT < 0.75 ? 1 : 1 - (localT - 0.75) / 0.25;
+    const lifeT = localSec / lifetimeSec;
+    if (lifeT >= 1) continue;
+    const fade = lifeT < 0.75 ? 1 : 1 - (lifeT - 0.75) / 0.25;
+    const localT = localSec / physicsSec;
     const x = bit.x + bit.vx * localT;
     const y = bit.y + bit.vy * localT + 0.5 * g * localT * localT;
     const rot = bit.rot + bit.vr * localT;

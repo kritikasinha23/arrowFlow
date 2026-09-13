@@ -3,6 +3,8 @@ import {
   RIPPLE_PULSE_S,
   RIPPLE_SPEED_PX_S,
   TAP_CONFETTI_COUNT,
+  TAP_FX_MS,
+  TAP_SPEED_SCALE,
   WIN_CONFETTI_COUNT,
   WIN_FX_MS,
   latticeRipple,
@@ -35,11 +37,24 @@ describe("celebration", () => {
     expect(win).toHaveLength(WIN_CONFETTI_COUNT);
     expect(new Set(win.map((b) => b.delay)).size).toBe(3);
     expect(bits).toHaveLength(TAP_CONFETTI_COUNT);
+    expect(TAP_CONFETTI_COUNT).toBe(36);
     expect(bits.length).toBeLessThan(win.length);
     expect(bits.every((b) => b.delay === 0 && b.x === 10 && b.y === 20)).toBe(true);
-    const winSpd = Math.max(...win.map((b) => Math.hypot(b.vx, b.vy)));
-    const tapSpd = Math.max(...bits.map((b) => Math.hypot(b.vx, b.vy)));
-    expect(tapSpd).toBeLessThan(winSpd);
+
+    const sameSeed = seedConfetti(origin, 12, 7, { bursts: 1, spread: 0, speedScale: 1 });
+    const scaled = seedConfetti(origin, 12, 7, {
+      bursts: 1,
+      spread: 0,
+      speedScale: TAP_SPEED_SCALE,
+    });
+    expect(TAP_FX_MS).toBe(WIN_FX_MS);
+    expect(TAP_SPEED_SCALE).toBe(1.2);
+    for (let i = 0; i < sameSeed.length; i++) {
+      expect(Math.hypot(scaled[i].vx, scaled[i].vy)).toBeCloseTo(
+        Math.hypot(sameSeed[i].vx, sameSeed[i].vy) * TAP_SPEED_SCALE,
+        5,
+      );
+    }
   });
 
   it("delays each lattice pulse by distance / constant speed", () => {
