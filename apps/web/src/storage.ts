@@ -24,6 +24,7 @@ const LAST_LEVEL_KEY = "arrowflow.lastLevel";
 const MUTE_KEY = "arrowflow.mute";
 const STREAK_KEY = "arrowflow.streak";
 const DAILY_DONE_KEY = "arrowflow.dailyDone";
+const FTUE_KEY = "arrowflow.ftueStep";
 
 export type StorageLike = {
   getItem(key: string): string | null;
@@ -225,6 +226,25 @@ export function setDailyDone(stamp: string): void {
 
 export function isDailyCompleted(stamp = utcStamp()): boolean {
   return getDailyDoneStamp() === stamp;
+}
+
+/** 0 = not started, 1–3 = tip for that First Steps board, 4 = done. */
+export function getFtueStep(): number {
+  const raw = safeGet(FTUE_KEY);
+  const n = raw ? Number(raw) : 0;
+  return Number.isFinite(n) ? Math.max(0, Math.min(4, Math.floor(n))) : 0;
+}
+
+export function setFtueStep(step: number): void {
+  safeSet(FTUE_KEY, String(Math.max(0, Math.min(4, Math.floor(step)))));
+}
+
+export function advanceFtue(clearedLevelId: string): void {
+  const order = ["flow_0001", "flow_0002", "flow_0003"] as const;
+  const idx = order.indexOf(clearedLevelId as (typeof order)[number]);
+  if (idx < 0) return;
+  const next = Math.max(getFtueStep(), idx + 2);
+  setFtueStep(Math.min(4, next));
 }
 
 export function utcStamp(date = new Date()): string {

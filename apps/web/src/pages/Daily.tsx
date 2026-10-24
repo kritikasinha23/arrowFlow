@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { TabBar } from "../chrome/TabBar";
 import { IconTrophy } from "../chrome/icons";
 import { getDaily, getDailyScores, type DailyBoard, type DailyScores } from "../api";
-import { levelNumber } from "../levels-shim";
+import { getDailyLevelId, levelNumber } from "../levels-shim";
 import { useSession } from "../session";
 import { isDailyCompleted, utcStamp } from "../storage";
 
@@ -14,7 +14,7 @@ export function Daily() {
   const label = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" });
   const [board, setBoard] = useState<DailyBoard | null>(null);
   const [scores, setScores] = useState<DailyScores | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     if (!session.ready) return;
@@ -24,10 +24,14 @@ export function Daily() {
         if (cancelled) return;
         setBoard(daily);
         setScores(table);
-        setError(null);
+        setOffline(false);
       })
       .catch(() => {
-        if (!cancelled) setError("Can't reach ArrowFlow right now");
+        if (cancelled) return;
+        // Offline-first: same seeded daily id the API would pick from packed catalog.
+        setBoard({ boardId: getDailyLevelId(new Date()), date: stamp });
+        setScores(null);
+        setOffline(true);
       });
     return () => {
       cancelled = true;
@@ -41,17 +45,17 @@ export function Daily() {
       <p className="lede" data-testid="daily-date">
         {label}
       </p>
-      {error ? (
-        <p className="hint-copy" data-testid="daily-error">
-          {error}
-        </p>
-      ) : board ? (
+      {board ? (
         <>
           <p className="level-num">Level {levelNumber(board.boardId)}</p>
           <Link className="play-btn" to={`/play/${board.boardId}?mode=daily`} data-testid="daily-play">
             {done ? "Replay" : "Play"}
           </Link>
-          {scores?.me ? (
+          {offline ? (
+            <p className="hint-copy" data-testid="daily-offline">
+              Offline challenge — scores sync when ArrowFlow is reachable.
+            </p>
+          ) : scores?.me ? (
             <p className="hint-copy">Your best · #{scores.me.rank} · {scores.me.score}</p>
           ) : (
             <p className="hint-copy">{done ? "Completed" : "One shared board for today."}</p>

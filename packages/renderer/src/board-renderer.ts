@@ -1,6 +1,5 @@
 import {
   HIT_WIDTH_PX,
-  STROKE_WIDTH_PX,
   VIEW_CLEAR_PAD_PX,
   buildRoundedStroke,
   cellCenters,
@@ -95,6 +94,15 @@ const DOT = "#c8cad6";
 const RAY = "124, 118, 168";
 const RAY_RED = "255, 59, 78";
 
+/** Keep stroke weight readable across board sizes without drowning small cells. */
+function strokeWidthForCell(screenCell: number): number {
+  return Math.min(7.5, Math.max(2.75, screenCell * 0.08));
+}
+
+function hitWidthForCell(screenCell: number): number {
+  return Math.min(64, Math.max(HIT_WIDTH_PX * 0.9, screenCell * 0.58));
+}
+
 function hatchPattern(ctx: CanvasRenderingContext2D): CanvasPattern | null {
   const c = document.createElement("canvas");
   c.width = 8;
@@ -134,11 +142,12 @@ export class BoardRenderer {
   }
 
   hitTest(mapper: CoordinateMapper, arrows: RenderArrow[], x: number, y: number): string | null {
+    const hitW = hitWidthForCell(mapper.screenCell);
     for (let i = arrows.length - 1; i >= 0; i--) {
       const arrow = arrows[i];
       if (arrow.hidden || arrow.ghost) continue;
       const pts = this.restPoints(mapper, arrow);
-      if (hitTestFatPolyline(pts, x, y, HIT_WIDTH_PX)) return arrow.id;
+      if (hitTestFatPolyline(pts, x, y, hitW)) return arrow.id;
     }
     return null;
   }
@@ -177,7 +186,7 @@ export class BoardRenderer {
     const view = mapperViewRect(mapper);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.lineWidth = STROKE_WIDTH_PX;
+    ctx.lineWidth = strokeWidthForCell(mapper.screenCell) * 0.92;
     for (const ray of headingRays(frame)) {
       const from = mapper.cellCenter(ray.from);
       const to = clipHeadingToView(from, ray.direction, view);
@@ -219,12 +228,13 @@ export class BoardRenderer {
     const color = arrow.isRed || arrow.animKind === "blocked" ? RED : INK;
     const pulse = frame.hintId === arrow.id ? frame.hintPulse ?? 0 : 0;
     const alpha = pulse > 0 ? 0.55 + 0.45 * Math.sin(pulse * Math.PI * 2) : 1;
+    const strokeW = strokeWidthForCell(mapper.screenCell);
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.strokeStyle = color;
-    ctx.lineWidth = STROKE_WIDTH_PX;
+    ctx.lineWidth = strokeW;
     buildRoundedStroke(ctx, visible, mapper.screenCell * 0.22);
     ctx.stroke();
     if (arrow.isRed) {
@@ -232,7 +242,7 @@ export class BoardRenderer {
       if (this.hatch) {
         ctx.save();
         buildRoundedStroke(ctx, visible, mapper.screenCell * 0.22);
-        ctx.lineWidth = HIT_WIDTH_PX * 0.45;
+        ctx.lineWidth = hitWidthForCell(mapper.screenCell) * 0.42;
         ctx.strokeStyle = this.hatch;
         ctx.globalAlpha = 0.35 * alpha;
         ctx.stroke();

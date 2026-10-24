@@ -45,6 +45,74 @@ export const PACKED_LEVEL_IDS = [
   'flow_0032',
 ] as const
 
+/** Shaped + long-mix boards (generator SILHOUETTE_SPECS). */
+export const SILHOUETTE_LEVEL_IDS = [
+  'flow_0033',
+  'flow_0034',
+  'flow_0035',
+  'flow_0036',
+  'flow_0037',
+  'flow_0038',
+  'flow_0039',
+  'flow_0040',
+  'flow_0041',
+  'flow_0042',
+  'flow_0043',
+  'flow_0044',
+] as const
+
+export type Tier = 'easy' | 'medium' | 'hard' | 'extraHard' | 'nightmare'
+
+/** Display tier for Levels UI — tutorial/workshop stay easy/medium by chapter. */
+export const LEVEL_TIER: Record<string, Tier> = {
+  flow_0013: 'easy',
+  flow_0014: 'easy',
+  flow_0015: 'medium',
+  flow_0016: 'medium',
+  flow_0017: 'medium',
+  flow_0018: 'medium',
+  flow_0019: 'hard',
+  flow_0020: 'hard',
+  flow_0021: 'hard',
+  flow_0022: 'hard',
+  flow_0023: 'hard',
+  flow_0024: 'hard',
+  flow_0025: 'extraHard',
+  flow_0026: 'extraHard',
+  flow_0027: 'extraHard',
+  flow_0028: 'extraHard',
+  flow_0029: 'extraHard',
+  flow_0030: 'nightmare',
+  flow_0031: 'nightmare',
+  flow_0032: 'nightmare',
+  flow_0033: 'medium',
+  flow_0034: 'medium',
+  flow_0035: 'hard',
+  flow_0036: 'hard',
+  flow_0037: 'hard',
+  flow_0038: 'hard',
+  flow_0039: 'extraHard',
+  flow_0040: 'extraHard',
+  flow_0041: 'extraHard',
+  flow_0042: 'nightmare',
+  flow_0043: 'nightmare',
+  flow_0044: 'nightmare',
+}
+
+export const TIER_LABEL: Record<Tier, string> = {
+  easy: 'Easy',
+  medium: 'Medium',
+  hard: 'Hard',
+  extraHard: 'Extra Hard',
+  nightmare: 'Nightmare',
+}
+
+export function tierForLevel(id: string): Tier | null {
+  if ((TUTORIAL_LEVEL_IDS as readonly string[]).includes(id)) return 'easy'
+  if ((WORKSHOP_LEVEL_IDS as readonly string[]).includes(id)) return 'medium'
+  return LEVEL_TIER[id] ?? null
+}
+
 export const CHAPTERS: Chapter[] = [
   { id: 'first-steps', title: 'First Steps', levelIds: [...TUTORIAL_LEVEL_IDS] },
   { id: 'workshop', title: 'Workshop', levelIds: [...WORKSHOP_LEVEL_IDS] },
@@ -58,12 +126,18 @@ export const CHAPTERS: Chapter[] = [
     title: 'Deep Grid',
     levelIds: PACKED_LEVEL_IDS.slice(10),
   },
+  {
+    id: 'silhouettes',
+    title: 'Silhouettes',
+    levelIds: [...SILHOUETTE_LEVEL_IDS],
+  },
 ]
 
 export const CAMPAIGN_LEVEL_IDS = [
   ...TUTORIAL_LEVEL_IDS,
   ...WORKSHOP_LEVEL_IDS,
   ...PACKED_LEVEL_IDS,
+  ...SILHOUETTE_LEVEL_IDS,
 ] as const
 
 /** Tutorial board. First-run start — not a missing-id fallback. */

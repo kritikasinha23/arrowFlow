@@ -52,11 +52,64 @@ export const CAR_MASK: ShapeMask = fromArt('car', [
   '.##.....##.',
 ])
 
+/** Classic 5-point-ish star blob. */
+export const STAR_MASK: ShapeMask = fromArt('star', [
+  '....#....',
+  '...###...',
+  '#########',
+  '.#######.',
+  '..##.##..',
+  '.##...##.',
+  '##.....##',
+])
+
+/** Diamond / kite. */
+export const DIAMOND_MASK: ShapeMask = fromArt('diamond', [
+  '....#....',
+  '...###...',
+  '..#####..',
+  '.#######.',
+  '#########',
+  '.#######.',
+  '..#####..',
+  '...###...',
+  '....#....',
+])
+
+/** Open C / horseshoe — forces routing around a bay. */
+export const C_BEND_MASK: ShapeMask = fromArt('cBend', [
+  '.#######',
+  '########',
+  '###.....',
+  '###.....',
+  '###.....',
+  '########',
+  '.#######',
+])
+
+/** Crescent moon. */
+export const MOON_MASK: ShapeMask = fromArt('moon', [
+  '..#####..',
+  '.#######.',
+  '####..##.',
+  '###....#.',
+  '###....#.',
+  '####..##.',
+  '.#######.',
+  '..#####..',
+])
+
 export const SHAPE_MASKS: Record<string, ShapeMask> = {
   heart: HEART_MASK,
   donut: DONUT_MASK,
   car: CAR_MASK,
+  star: STAR_MASK,
+  diamond: DIAMOND_MASK,
+  cBend: C_BEND_MASK,
+  moon: MOON_MASK,
 }
+
+export type ShapeMaskId = keyof typeof SHAPE_MASKS
 
 export function playableCount(shape: ShapeMask): number {
   let n = 0

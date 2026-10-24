@@ -32,21 +32,46 @@ import {
   unweaveStopProgress,
   viewClearTravelPx,
 } from "@arrowflow/twine";
-import { IconBack, IconHash, IconHeart, IconSpark, IconUndo } from "../chrome/icons";
+import { IconBack, IconFit, IconHash, IconHeart, IconSpark, IconStar, IconUndo } from "../chrome/icons";
 import { getBoard, UnknownLevelError } from "../boards";
 import { PuzzleEngine, type ArrowModel } from "../engine-bridge";
 import { getToken } from "../guest";
-import { CAMPAIGN_START_ID, nextCampaignLevelId } from "../levels-shim";
-import { commitWinLocally, flushPendingScores } from "../scores";
+import { CAMPAIGN_START_ID, levelNumber, nextCampaignLevelId } from "../levels-shim";
+import { bestFromWin, commitWinLocally, flushPendingScores } from "../scores";
 import { useSession } from "../session";
 import {
+  advanceFtue,
   cycleLines,
+  getFtueStep,
   getLastLevel,
   getLinesMode,
+  getStreak,
   setLinesMode,
   utcStamp,
 } from "../storage";
 import { acceptTap } from "../weave-queue";
+
+const FTUE_TIPS: Record<string, string> = {
+  flow_0001: "Tap the arrow — it flies the way it points.",
+  flow_0002: "Order matters. A blocked path costs a heart.",
+  flow_0003: "Stuck? Try Hint, or Hash to see exit rays.",
+};
+
+type WinStats = {
+  stars: number;
+  score: number;
+  heartsLeft: number;
+  moves: number;
+  hints: number;
+  elapsedMs: number;
+};
+
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 type FlightAnim = {
   id: string;
@@ -152,8 +177,10 @@ export function Play() {
   sessionRef.current = session;
   const [hearts, setHearts] = useState(3);
   const [flightCount, setFlightCount] = useState(0);
+  const [ghostCount, setGhostCount] = useState(0);
   const [won, setWon] = useState(false);
   const [showWinCard, setShowWinCard] = useState(false);
+  const [winStats, setWinStats] = useState<WinStats | null>(null);
   const [failed, setFailed] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const [lines, setLines] = useState<LinesMode>(getLinesMode);
@@ -187,7 +214,7 @@ export function Play() {
       submittedRef.current = true;
       const mode = playMode === "daily" ? "daily" : playMode === "league" ? "league" : "campaign";
       if (engine.hearts > 0) {
-        commitWinLocally({
+        const winInput = {
           boardId: engine.board.levelId,
           mode,
           heartsLeft: engine.hearts,
@@ -198,7 +225,18 @@ export function Play() {
           moveLog: moveLogRef.current,
           date: mode === "daily" ? utcStamp() : undefined,
           seasonId: mode === "league" ? sessionRef.current.profile?.league?.seasonId : undefined,
+        } as const;
+        const best = bestFromWin(winInput);
+        setWinStats({
+          stars: best.stars,
+          score: best.score,
+          heartsLeft: best.heartsLeft,
+          moves: best.moves,
+          hints: winInput.hints,
+          elapsedMs: winInput.elapsedMs,
         });
+        commitWinLocally(winInput);
+        if (mode === "campaign") advanceFtue(winInput.boardId);
         void flushPendingScores(getToken()).then(() => {
           void sessionRef.current.refresh();
         });
@@ -234,7 +272,8 @@ export function Play() {
     canvas.height = Math.floor(cssH * dpr);
     const bounds = contentBoundsRef.current;
     const mapper = new CoordinateMapper(engine.board.width, engine.board.height, cssW, cssH, {
-      padRatio: 0.1,
+      // Tight margin so ink owns the play area (Arrows Out / Arrow Escape pattern).
+      padRatio: 0.04,
       view: viewRef.current,
       content: bounds,
     });
@@ -283,11 +322,17 @@ export function Play() {
     }
   }, []);
 
+  const syncFlights = useCallback(() => {
+    const flights = [...flightsRef.current.values()];
+    setFlightCount(flights.length);
+    setGhostCount(flights.filter((f) => f.kind === "free").length);
+  }, []);
+
   const cancelFlights = useCallback(() => {
     for (const flight of flightsRef.current.values()) flight.cancel();
     flightsRef.current.clear();
-    setFlightCount(0);
-  }, []);
+    syncFlights();
+  }, [syncFlights]);
 
   const cancelWinFx = useCallback(() => {
     if (winFxRafRef.current) cancelAnimationFrame(winFxRafRef.current);
@@ -304,6 +349,7 @@ export function Play() {
     cancelFlights();
     cancelWinFx();
     setShowWinCard(false);
+    setWinStats(null);
     hintRef.current = null;
     viewRef.current = { ...FIT_VIEW };
     contentBoxRef.current = null;
@@ -320,6 +366,8 @@ export function Play() {
       engineRef.current = new PuzzleEngine(board);
       const startCells = board.arrows.flatMap((a) => a.cells);
       latticeRef.current = latticeCells(startCells);
+      // Frame the starting footprint (locked for the whole run — never re-fit as
+      // arrows leave). Keeps early boards large/tactile like Arrows Out.
       contentBoundsRef.current = occupiedBounds(startCells) ?? boardBounds(board.width, board.height);
       setUnavailable(false);
       setFailed(false);
@@ -357,7 +405,7 @@ export function Play() {
 
   useEffect(() => {
     paint();
-  }, [lines, paint, hearts, pieceCount, redIds, won, selectedId, viewTick, flightCount, showWinCard]);
+  }, [lines, paint, hearts, pieceCount, redIds, won, selectedId, viewTick, flightCount, ghostCount, showWinCard]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -387,7 +435,7 @@ export function Play() {
 
   const onHint = () => {
     const engine = engineRef.current;
-    if (!engine || engine.isWon) return;
+    if (!engine || engine.isWon || engine.isOutOfHearts) return;
     const ids = engine.availableArrows();
     hintRef.current = ids[0] ?? null;
     if (!hintRef.current) return;
@@ -505,7 +553,7 @@ export function Play() {
         cancel: () => {},
       };
       flightsRef.current.set(id, flight);
-      setFlightCount(flightsRef.current.size);
+      syncFlights();
       paint();
       const ticker = createWeaveTicker(
         result.kind,
@@ -519,7 +567,7 @@ export function Play() {
         () => {
           const cur = flightsRef.current.get(id);
           if (cur) flightsRef.current.delete(id);
-          setFlightCount(flightsRef.current.size);
+          syncFlights();
           if (result.kind === "blocked") {
             engine.commitBlocked(id);
             moveLogRef.current.push({
@@ -537,7 +585,7 @@ export function Play() {
       );
       flight.cancel = ticker.cancel;
     },
-    [paint, syncHud, startWinFx],
+    [paint, syncHud, startWinFx, syncFlights],
   );
 
   const onTap = (cssX: number, cssY: number) => {
@@ -677,7 +725,9 @@ export function Play() {
   };
 
   const onUndo = () => {
-    if (showWinCard || engineRef.current?.isWon) return;
+    if (showWinCard) return;
+    // Allow undo while the last free ghost is still exiting (won is already true).
+    if (engineRef.current?.isWon && ghostCount === 0 && flightCount === 0) return;
     cancelFlights();
     engineRef.current?.undo();
     syncHud();
@@ -717,10 +767,19 @@ export function Play() {
 
   const fit = viewIsFit(viewRef.current);
   const startCount = startCountRef.current || Math.max(pieceCount, 1);
-  const cleared = Math.max(0, startCount - pieceCount);
-  const progress = won || showWinCard ? 1 : cleared / startCount;
+  // Count free exit ghosts so the progress bar does not jump ahead mid-flight.
+  const visualRemaining = pieceCount + ghostCount;
+  const cleared = Math.max(0, startCount - visualRemaining);
+  const boardSettled = ghostCount === 0 && flightCount === 0;
+  const progress = showWinCard || (won && boardSettled) ? 1 : cleared / startCount;
   const campaignMode = playMode !== "daily" && playMode !== "league";
   const nextId = campaignMode ? nextCampaignLevelId(levelLabel) : null;
+  const undoLocked = showWinCard || (won && boardSettled);
+  const hintLocked = won || showWinCard || failed;
+  const ftueTip =
+    !won && !failed && !showWinCard && FTUE_TIPS[levelLabel] && getFtueStep() < 4
+      ? FTUE_TIPS[levelLabel]
+      : null;
 
   if (unavailable) {
     return (
@@ -755,7 +814,7 @@ export function Play() {
             data-testid="btn-undo"
             aria-label="Undo"
             title="Undo · hold to reset"
-            disabled={showWinCard || won}
+            disabled={undoLocked}
             onClick={onUndo}
             onPointerDown={onUndoHoldStart}
             onPointerUp={onUndoHoldEnd}
@@ -774,7 +833,7 @@ export function Play() {
           ))}
         </div>
         <div className="hud-right">
-          <button type="button" className="hint-pill" data-testid="btn-hint" onClick={onHint} disabled={won || showWinCard}>
+          <button type="button" className="hint-pill" data-testid="btn-hint" onClick={onHint} disabled={hintLocked}>
             <IconSpark />
             Hint
           </button>
@@ -809,13 +868,14 @@ export function Play() {
             className="circle-btn fit-btn"
             data-testid="btn-fit"
             data-fit="false"
-            aria-label="Fit"
+            aria-label="Fit board"
+            title="Fit board"
             onClick={() => {
               resetView();
               requestAnimationFrame(paint);
             }}
           >
-            ·
+            <IconFit />
           </button>
         ) : (
           <span className="sr-only" data-testid="btn-fit" data-fit="true" />
@@ -830,11 +890,42 @@ export function Play() {
         >
           <IconHash />
         </button>
+        {ftueTip ? (
+          <div className="ftue-tip" data-testid="ftue-tip">
+            {ftueTip}
+          </div>
+        ) : null}
       </div>
 
       {showWinCard ? (
         <aside className="win-card" data-testid="win-card" data-won="true">
-          <p>Board clear</p>
+          <p className="win-card-title">
+            {playMode === "daily" ? "Daily clear" : playMode === "league" ? "League clear" : `Level ${levelNumber(levelLabel)} clear`}
+          </p>
+          <div className="win-stars" data-testid="win-stars" data-stars={winStats?.stars ?? 0}>
+            {Array.from({ length: 3 }, (_, i) => (
+              <IconStar
+                key={i}
+                size={28}
+                filled={i < (winStats?.stars ?? 0)}
+                className={i < (winStats?.stars ?? 0) ? "win-star on" : "win-star off"}
+              />
+            ))}
+          </div>
+          <div className="win-score" data-testid="win-score">
+            {(winStats?.score ?? 0).toLocaleString()}
+          </div>
+          <div className="win-meta" data-testid="win-meta">
+            <span>{winStats?.heartsLeft ?? 0} hearts</span>
+            <span>{winStats?.moves ?? 0} moves</span>
+            <span>{formatElapsed(winStats?.elapsedMs ?? 0)}</span>
+            {(winStats?.hints ?? 0) > 0 ? <span>{winStats?.hints} hints</span> : null}
+          </div>
+          {(session.streak > 0 || getStreak() > 0) && (
+            <div className="win-streak" data-testid="win-streak">
+              Streak {Math.max(session.streak, getStreak())}
+            </div>
+          )}
           <div className="win-card-actions">
             {nextId ? (
               <Link className="play-btn" to={`/play/${nextId}?mode=campaign`} data-testid="win-next">

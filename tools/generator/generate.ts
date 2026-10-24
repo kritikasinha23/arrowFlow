@@ -32,6 +32,10 @@ export type GenerateLevelInput = {
   difficulty?: number
   maxIRatio?: number
   attempts?: number
+  /** Bias toward longer snakes (extraHard / nightmare / longMix). */
+  preferLong?: boolean
+  /** Extra cells allowed beyond the default max piece length cap. */
+  maxPieceBonus?: number
 }
 
 export type ExitCandidate = {
@@ -40,16 +44,23 @@ export type ExitCandidate = {
   rimDegree: number
 }
 
-function maxPieceLen(playable: number): number {
-  if (playable <= 16) return 6
-  if (playable <= 36) return 8
-  if (playable <= 64) return 10
-  if (playable <= 100) return 12
-  return 14
+function maxPieceLen(playable: number, bonus = 0): number {
+  let base = 14
+  if (playable <= 16) base = 6
+  else if (playable <= 36) base = 8
+  else if (playable <= 64) base = 10
+  else if (playable <= 100) base = 12
+  return base + Math.max(0, bonus)
 }
 
-function pickTargetLen(remaining: number, playable: number, rng: SeededRng): number {
-  const cap = Math.min(maxPieceLen(playable), remaining)
+function pickTargetLen(
+  remaining: number,
+  playable: number,
+  rng: SeededRng,
+  preferLong = false,
+  maxPieceBonus = 0,
+): number {
+  const cap = Math.min(maxPieceLen(playable, maxPieceBonus), remaining)
   const options: number[] = []
   for (let len = 2; len <= cap; len++) {
     const left = remaining - len
@@ -57,6 +68,7 @@ function pickTargetLen(remaining: number, playable: number, rng: SeededRng): num
     options.push(len)
     if (len >= 5 && len <= 10) options.push(len, len, len)
     if (len >= 7 && len <= 12) options.push(len)
+    if (preferLong && len >= Math.ceil(cap * 0.55)) options.push(len, len, len)
   }
   if (options.length === 0) return remaining >= 2 ? remaining : 0
   return options[rng.int(options.length)]
@@ -292,6 +304,8 @@ function carvePieces(
   mask: CellMask,
   rng: SeededRng,
   minTurns: number,
+  preferLong = false,
+  maxPieceBonus = 0,
 ): GridPoint[][] | null {
   const playable = playableCells(width, height, mask)
   if (playable.length < 2) return null
@@ -322,7 +336,7 @@ function carvePieces(
       continue
     }
 
-    const target = pickTargetLen(remaining.size, playable.length, rng)
+    const target = pickTargetLen(remaining.size, playable.length, rng, preferLong, maxPieceBonus)
     const exits = findExits(remaining, lookup, width, height, rng)
     if (exits.length === 0) return null
 
@@ -377,7 +391,10 @@ export function generateLevel(input: GenerateLevelInput): BoardModel {
   const playable = playableCells(width, height, mask)
   if (playable.length < 2) throw new Error('mask too small')
 
-  const minTurns = input.minTurns ?? (playable.length >= 25 ? 2 : 1)
+  const preferLong = input.preferLong ?? false
+  const maxPieceBonus = input.maxPieceBonus ?? 0
+  const minTurns =
+    input.minTurns ?? (preferLong ? 2 : playable.length >= 25 ? 2 : 1)
   const maxI = input.maxIRatio ?? defaultMaxIRatio(playable.length)
   const attempts = input.attempts ?? (playable.length >= 80 ? 80 : 56)
   const levelId = input.levelId ?? `gen_${width}x${height}`
@@ -388,13 +405,16 @@ export function generateLevel(input: GenerateLevelInput): BoardModel {
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     const rng = new SeededRng((seed + attempt * 10007) >>> 0)
-    const pieces = carvePieces(width, height, mask, rng, minTurns)
+    const pieces = carvePieces(width, height, mask, rng, minTurns, preferLong, maxPieceBonus)
     if (!pieces) continue
     const board = piecesToBoard(pieces, width, height, levelId, difficulty)
     if (!isPacked(board, mask)) continue
     if (!isBoardSolvable(board)) continue
     const wiggly = boardLooksWiggly(board, maxI, minTurns, playable.length)
-    const score = avgTurns(board) * 3 - iPieceRatio(board) * 8 + (wiggly ? 2 : 0)
+    const longBonus = preferLong
+      ? board.arrows.reduce((s, a) => s + Math.max(0, a.cells.length - 5), 0) * 0.15
+      : 0
+    const score = avgTurns(board) * 3 - iPieceRatio(board) * 8 + (wiggly ? 2 : 0) + longBonus
     if (score > bestScore) {
       best = board
       bestScore = score

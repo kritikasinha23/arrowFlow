@@ -1,11 +1,18 @@
 import { exitRay, headingOf } from '../../packages/engine/src/geometry.ts'
 import type { BoardModel, Direction, GridPoint } from '../../packages/engine/src/types.ts'
 import { generateLevel } from './generate.ts'
+import { SHAPE_MASKS, type ShapeMaskId } from './masks.ts'
 import { SeededRng, type CellMask } from './util.ts'
 
 export { generateLevel } from './generate.ts'
 export { isBoardSolvable } from './peel.ts'
 export { SeededRng, type CellMask } from './util.ts'
+
+/** Arrow Escape–style difficulty bands. */
+export type Tier = 'easy' | 'medium' | 'hard' | 'extraHard' | 'nightmare'
+
+/** Layout rhythm within a chapter (seeded shuffle of these kinds). */
+export type LayoutKind = 'rect' | 'shape' | 'longMix' | 'bossShape'
 
 export type CatalogSpec = {
   id: string
@@ -13,30 +20,60 @@ export type CatalogSpec = {
   height: number
   seed: number
   difficulty: number
+  tier?: Tier
+  layout?: LayoutKind
+  maskId?: ShapeMaskId
+}
+
+const TIER_DIFFICULTY: Record<Tier, number> = {
+  easy: 2,
+  medium: 3,
+  hard: 4,
+  extraHard: 5,
+  nightmare: 6,
 }
 
 /** 20 packed originals, 5×5 through 10×12. Seeds are frozen for deterministic JSON. */
 export const GENERATED_SPECS: CatalogSpec[] = [
-  { id: 'flow_0013', width: 5, height: 5, seed: 1301, difficulty: 2 },
-  { id: 'flow_0014', width: 5, height: 6, seed: 1402, difficulty: 2 },
-  { id: 'flow_0015', width: 6, height: 6, seed: 1503, difficulty: 3 },
-  { id: 'flow_0016', width: 6, height: 7, seed: 1604, difficulty: 3 },
-  { id: 'flow_0017', width: 6, height: 8, seed: 1705, difficulty: 3 },
-  { id: 'flow_0018', width: 7, height: 7, seed: 1806, difficulty: 3 },
-  { id: 'flow_0019', width: 7, height: 8, seed: 1907, difficulty: 4 },
-  { id: 'flow_0020', width: 7, height: 9, seed: 2008, difficulty: 4 },
-  { id: 'flow_0021', width: 7, height: 10, seed: 2109, difficulty: 4 },
-  { id: 'flow_0022', width: 8, height: 8, seed: 2210, difficulty: 4 },
-  { id: 'flow_0023', width: 8, height: 9, seed: 2311, difficulty: 4 },
-  { id: 'flow_0024', width: 8, height: 10, seed: 2412, difficulty: 4 },
-  { id: 'flow_0025', width: 8, height: 12, seed: 2513, difficulty: 5 },
-  { id: 'flow_0026', width: 9, height: 9, seed: 2614, difficulty: 5 },
-  { id: 'flow_0027', width: 9, height: 10, seed: 2715, difficulty: 5 },
-  { id: 'flow_0028', width: 9, height: 11, seed: 2816, difficulty: 5 },
-  { id: 'flow_0029', width: 10, height: 10, seed: 2917, difficulty: 5 },
-  { id: 'flow_0030', width: 10, height: 11, seed: 3018, difficulty: 5 },
-  { id: 'flow_0031', width: 10, height: 12, seed: 3119, difficulty: 5 },
-  { id: 'flow_0032', width: 10, height: 12, seed: 3220, difficulty: 5 },
+  { id: 'flow_0013', width: 5, height: 5, seed: 1301, difficulty: 2, tier: 'easy', layout: 'rect' },
+  { id: 'flow_0014', width: 5, height: 6, seed: 1402, difficulty: 2, tier: 'easy', layout: 'rect' },
+  { id: 'flow_0015', width: 6, height: 6, seed: 1503, difficulty: 3, tier: 'medium', layout: 'rect' },
+  { id: 'flow_0016', width: 6, height: 7, seed: 1604, difficulty: 3, tier: 'medium', layout: 'rect' },
+  { id: 'flow_0017', width: 6, height: 8, seed: 1705, difficulty: 3, tier: 'medium', layout: 'longMix' },
+  { id: 'flow_0018', width: 7, height: 7, seed: 1806, difficulty: 3, tier: 'medium', layout: 'rect' },
+  { id: 'flow_0019', width: 7, height: 8, seed: 1907, difficulty: 4, tier: 'hard', layout: 'rect' },
+  { id: 'flow_0020', width: 7, height: 9, seed: 2008, difficulty: 4, tier: 'hard', layout: 'rect' },
+  { id: 'flow_0021', width: 7, height: 10, seed: 2109, difficulty: 4, tier: 'hard', layout: 'longMix' },
+  { id: 'flow_0022', width: 8, height: 8, seed: 2210, difficulty: 4, tier: 'hard', layout: 'rect' },
+  { id: 'flow_0023', width: 8, height: 9, seed: 2311, difficulty: 4, tier: 'hard', layout: 'rect' },
+  { id: 'flow_0024', width: 8, height: 10, seed: 2412, difficulty: 4, tier: 'hard', layout: 'rect' },
+  { id: 'flow_0025', width: 8, height: 12, seed: 2513, difficulty: 5, tier: 'extraHard', layout: 'longMix' },
+  { id: 'flow_0026', width: 9, height: 9, seed: 2614, difficulty: 5, tier: 'extraHard', layout: 'rect' },
+  { id: 'flow_0027', width: 9, height: 10, seed: 2715, difficulty: 5, tier: 'extraHard', layout: 'rect' },
+  { id: 'flow_0028', width: 9, height: 11, seed: 2816, difficulty: 5, tier: 'extraHard', layout: 'rect' },
+  { id: 'flow_0029', width: 10, height: 10, seed: 2917, difficulty: 5, tier: 'extraHard', layout: 'rect' },
+  { id: 'flow_0030', width: 10, height: 11, seed: 3018, difficulty: 5, tier: 'nightmare', layout: 'rect' },
+  { id: 'flow_0031', width: 10, height: 12, seed: 3119, difficulty: 5, tier: 'nightmare', layout: 'longMix' },
+  { id: 'flow_0032', width: 10, height: 12, seed: 3220, difficulty: 5, tier: 'nightmare', layout: 'rect' },
+]
+
+/**
+ * Silhouettes chapter candidates — shaped + longMix + boss.
+ * Generated via export-samples; curated IDs land in packages/levels.
+ */
+export const SILHOUETTE_SPECS: CatalogSpec[] = [
+  { id: 'flow_0033', width: 9, height: 8, seed: 3301, difficulty: 3, tier: 'medium', layout: 'shape', maskId: 'heart' },
+  { id: 'flow_0034', width: 9, height: 9, seed: 3402, difficulty: 3, tier: 'medium', layout: 'shape', maskId: 'donut' },
+  { id: 'flow_0035', width: 11, height: 6, seed: 3503, difficulty: 4, tier: 'hard', layout: 'shape', maskId: 'car' },
+  { id: 'flow_0036', width: 9, height: 7, seed: 3604, difficulty: 4, tier: 'hard', layout: 'shape', maskId: 'star' },
+  { id: 'flow_0037', width: 9, height: 9, seed: 3705, difficulty: 4, tier: 'hard', layout: 'bossShape', maskId: 'diamond' },
+  { id: 'flow_0038', width: 8, height: 7, seed: 3806, difficulty: 4, tier: 'hard', layout: 'shape', maskId: 'cBend' },
+  { id: 'flow_0039', width: 9, height: 8, seed: 3907, difficulty: 5, tier: 'extraHard', layout: 'shape', maskId: 'moon' },
+  { id: 'flow_0040', width: 8, height: 10, seed: 4011, difficulty: 5, tier: 'extraHard', layout: 'longMix' },
+  { id: 'flow_0041', width: 9, height: 8, seed: 4112, difficulty: 5, tier: 'extraHard', layout: 'bossShape', maskId: 'heart' },
+  { id: 'flow_0042', width: 9, height: 9, seed: 4213, difficulty: 6, tier: 'nightmare', layout: 'bossShape', maskId: 'donut' },
+  { id: 'flow_0043', width: 11, height: 6, seed: 4314, difficulty: 6, tier: 'nightmare', layout: 'bossShape', maskId: 'car' },
+  { id: 'flow_0044', width: 9, height: 9, seed: 4415, difficulty: 6, tier: 'nightmare', layout: 'longMix' },
 ]
 
 export const LEAGUE_LEVEL_ID = 'flow_0031'
@@ -351,8 +388,19 @@ export function generatePackedLevel(
   seed: number,
   difficulty = 2,
   mask?: CellMask,
+  opts?: { preferLong?: boolean; maxPieceBonus?: number; minTurns?: number },
 ): BoardModel {
-  return generateLevel({ width, height, mask, seed, levelId, difficulty })
+  return generateLevel({
+    width,
+    height,
+    mask,
+    seed,
+    levelId,
+    difficulty,
+    preferLong: opts?.preferLong,
+    maxPieceBonus: opts?.maxPieceBonus,
+    minTurns: opts?.minTurns,
+  })
 }
 
 export function generateHamiltonianLevel(
@@ -365,6 +413,23 @@ export function generateHamiltonianLevel(
   return generatePackedLevel(width, height, levelId, seed, difficulty)
 }
 
+function layoutOpts(spec: CatalogSpec): { preferLong?: boolean; maxPieceBonus?: number; minTurns?: number } {
+  const layout = spec.layout ?? 'rect'
+  const tier = spec.tier ?? 'medium'
+  if (layout === 'longMix' || layout === 'bossShape' || tier === 'nightmare' || tier === 'extraHard') {
+    return {
+      preferLong: true,
+      maxPieceBonus: tier === 'nightmare' ? 4 : tier === 'extraHard' ? 2 : 1,
+      minTurns: tier === 'nightmare' || layout === 'bossShape' ? 3 : 2,
+    }
+  }
+  return {}
+}
+
 export function generateCatalogLevel(spec: CatalogSpec): BoardModel {
-  return generatePackedLevel(spec.width, spec.height, spec.id, spec.seed, spec.difficulty)
+  const mask = spec.maskId ? SHAPE_MASKS[spec.maskId].cells : undefined
+  const width = spec.maskId ? SHAPE_MASKS[spec.maskId].width : spec.width
+  const height = spec.maskId ? SHAPE_MASKS[spec.maskId].height : spec.height
+  const difficulty = spec.difficulty || (spec.tier ? TIER_DIFFICULTY[spec.tier] : 2)
+  return generatePackedLevel(width, height, spec.id, spec.seed, difficulty, mask, layoutOpts(spec))
 }

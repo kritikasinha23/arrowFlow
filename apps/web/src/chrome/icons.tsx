@@ -299,6 +299,21 @@ export function IconHeart({ size = 17, className, filled = false }: IconProps) {
   );
 }
 
+export function IconFit({ size = 16, className }: IconProps) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M4.5 9.2V4.5H9.2M14.8 4.5h4.7V9.2M19.5 14.8v4.7H14.8M9.2 19.5H4.5V14.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function IconHash({ size = 20, className }: IconProps) {
   return (
     <svg className={`icon-hash ${className ?? ""}`} width={size} height={size} viewBox="0 0 24 24" aria-hidden>

@@ -159,6 +159,10 @@ test("weave takes real time on a free solo level", async ({ page }) => {
   await expect(canvas).toHaveAttribute("data-busy", "false", { timeout: 3500 });
   await expect(canvas).toHaveAttribute("data-ghost-count", "0");
   await expect(canvas).toHaveAttribute("data-piece-count", "0");
+  await expect(page.getByTestId("win-card")).toBeVisible({ timeout: 4000 });
+  await expect(page.getByTestId("win-stars")).toHaveAttribute("data-stars", "3");
+  await expect(page.getByTestId("win-score")).toBeVisible();
+  await expect(page.getByTestId("win-meta")).toContainText("hearts");
 });
 
 test("starting lattice and fit box stay after a piece leaves", async ({ page }) => {
@@ -166,13 +170,15 @@ test("starting lattice and fit box stay after a piece leaves", async ({ page }) 
   const canvas = page.getByTestId("board-canvas");
   await expect(canvas).toHaveAttribute("data-lattice-count", "4");
   await expect(canvas).toHaveAttribute("data-ray-count", "0");
-  const bounds = await canvas.getAttribute("data-bounds");
-  expect(bounds).toBeTruthy();
+  // Starting footprint (1×4 strip), locked — must not shrink when B leaves.
+  await expect(canvas).toHaveAttribute("data-bounds", "1,0,1,3");
+  const hitA = await canvas.getAttribute("data-hit-A");
   await clickHit(page, "B");
   await expect(canvas).toHaveAttribute("data-piece-count", "1");
   await expect(canvas).toHaveAttribute("data-lattice-count", "4");
   await expect(canvas).toHaveAttribute("data-ray-count", "0");
-  await expect(canvas).toHaveAttribute("data-bounds", bounds!);
+  await expect(canvas).toHaveAttribute("data-bounds", "1,0,1,3");
+  await expect(canvas).toHaveAttribute("data-hit-A", hitA!);
 });
 
 test("hash toggles heading rays and keeps lattice dots", async ({ page }) => {
