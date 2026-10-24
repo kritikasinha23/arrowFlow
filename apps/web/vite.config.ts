@@ -2,7 +2,13 @@ import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+/** Public tunnel: https://t3.qooq.space/<port> keeps the /<port> path prefix. */
+const PORT = 5173;
+const BASE = `/${PORT}/`;
+const PUBLIC_HOST = "t3.qooq.space";
+
 export default defineConfig({
+  base: BASE,
   plugins: [react()],
   resolve: {
     alias: {
@@ -14,8 +20,14 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: 5173,
+    port: PORT,
     strictPort: true,
+    allowedHosts: [PUBLIC_HOST, `.${PUBLIC_HOST.split(".").slice(-2).join(".")}`, "localhost"],
+    hmr: {
+      protocol: "wss",
+      host: PUBLIC_HOST,
+      clientPort: 443,
+    },
   },
   preview: {
     port: 4173,

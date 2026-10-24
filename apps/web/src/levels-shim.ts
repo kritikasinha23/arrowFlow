@@ -9,7 +9,10 @@ import {
   LEAGUE_LEVEL_ID,
   nextCampaignLevelId,
   PACKED_LEVEL_IDS,
+  SILHOUETTE_LEVEL_IDS,
+  TIER_LABEL,
   levelNumber,
+  tierForLevel,
 } from "../../../packages/levels/src/catalog.ts";
 import flow0001 from "../../../packages/levels/src/levels/flow_0001.json";
 import flow0002 from "../../../packages/levels/src/levels/flow_0002.json";
@@ -43,6 +46,18 @@ import flow0029 from "../../../packages/levels/src/levels/flow_0029.json";
 import flow0030 from "../../../packages/levels/src/levels/flow_0030.json";
 import flow0031 from "../../../packages/levels/src/levels/flow_0031.json";
 import flow0032 from "../../../packages/levels/src/levels/flow_0032.json";
+import flow0033 from "../../../packages/levels/src/levels/flow_0033.json";
+import flow0034 from "../../../packages/levels/src/levels/flow_0034.json";
+import flow0035 from "../../../packages/levels/src/levels/flow_0035.json";
+import flow0036 from "../../../packages/levels/src/levels/flow_0036.json";
+import flow0037 from "../../../packages/levels/src/levels/flow_0037.json";
+import flow0038 from "../../../packages/levels/src/levels/flow_0038.json";
+import flow0039 from "../../../packages/levels/src/levels/flow_0039.json";
+import flow0040 from "../../../packages/levels/src/levels/flow_0040.json";
+import flow0041 from "../../../packages/levels/src/levels/flow_0041.json";
+import flow0042 from "../../../packages/levels/src/levels/flow_0042.json";
+import flow0043 from "../../../packages/levels/src/levels/flow_0043.json";
+import flow0044 from "../../../packages/levels/src/levels/flow_0044.json";
 
 const LEVELS = [
   flow0001,
@@ -77,6 +92,18 @@ const LEVELS = [
   flow0030,
   flow0031,
   flow0032,
+  flow0033,
+  flow0034,
+  flow0035,
+  flow0036,
+  flow0037,
+  flow0038,
+  flow0039,
+  flow0040,
+  flow0041,
+  flow0042,
+  flow0043,
+  flow0044,
 ] as BoardModel[];
 
 export function getLevel(id: string): BoardModel {
@@ -103,5 +130,8 @@ export {
   LEAGUE_LEVEL_ID,
   nextCampaignLevelId,
   PACKED_LEVEL_IDS,
+  SILHOUETTE_LEVEL_IDS,
+  TIER_LABEL,
   levelNumber,
+  tierForLevel,
 };

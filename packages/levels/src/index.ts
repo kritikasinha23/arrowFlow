@@ -42,6 +42,18 @@ import flow0029 from './levels/flow_0029.json'
 import flow0030 from './levels/flow_0030.json'
 import flow0031 from './levels/flow_0031.json'
 import flow0032 from './levels/flow_0032.json'
+import flow0033 from './levels/flow_0033.json'
+import flow0034 from './levels/flow_0034.json'
+import flow0035 from './levels/flow_0035.json'
+import flow0036 from './levels/flow_0036.json'
+import flow0037 from './levels/flow_0037.json'
+import flow0038 from './levels/flow_0038.json'
+import flow0039 from './levels/flow_0039.json'
+import flow0040 from './levels/flow_0040.json'
+import flow0041 from './levels/flow_0041.json'
+import flow0042 from './levels/flow_0042.json'
+import flow0043 from './levels/flow_0043.json'
+import flow0044 from './levels/flow_0044.json'
 
 function cloneLevel(level: BoardModel): BoardModel {
   return JSON.parse(JSON.stringify(level)) as BoardModel
@@ -80,6 +92,18 @@ const LEVELS: BoardModel[] = [
   flow0030,
   flow0031,
   flow0032,
+  flow0033,
+  flow0034,
+  flow0035,
+  flow0036,
+  flow0037,
+  flow0038,
+  flow0039,
+  flow0040,
+  flow0041,
+  flow0042,
+  flow0043,
+  flow0044,
 ]
 
 const BY_ID = new Map(LEVELS.map((level) => [level.levelId, level]))
@@ -112,8 +136,11 @@ export {
   LEAGUE_LEVEL_ID,
   nextCampaignLevelId,
   PACKED_LEVEL_IDS,
+  SILHOUETTE_LEVEL_IDS,
+  TIER_LABEL,
+  tierForLevel,
 }
-export type { Chapter } from './catalog.ts'
+export type { Chapter, Tier } from './catalog.ts'
 export {
   applyCampaignWin,
   applyModeBest,

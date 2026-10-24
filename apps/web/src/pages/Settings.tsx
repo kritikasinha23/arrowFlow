@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { TabBar } from "../chrome/TabBar";
 import { DISPLAY_NAME_MAX } from "../../../../packages/engine/src/names.ts";
 import { useSession } from "../session";
-import { getLinesMode, getMuted, setLinesMode, setMuted } from "../storage";
+import { getLinesMode, setLinesMode } from "../storage";
 import type { LinesMode } from "@arrowflow/renderer";
 
 export function Settings() {
   const session = useSession();
   const [name, setName] = useState(session.displayName);
   const [lines, setLines] = useState<LinesMode>(getLinesMode);
-  const [mute, setMute] = useState(getMuted);
   const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,18 +48,6 @@ export function Settings() {
             const next: LinesMode = e.target.checked ? "on" : "off";
             setLines(next);
             setLinesMode(next);
-          }}
-        />
-      </label>
-      <label className="field row">
-        <span>Mute</span>
-        <input
-          type="checkbox"
-          data-testid="settings-mute"
-          checked={mute}
-          onChange={(e) => {
-            setMute(e.target.checked);
-            setMuted(e.target.checked);
           }}
         />
       </label>

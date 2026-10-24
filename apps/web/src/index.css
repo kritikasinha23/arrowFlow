@@ -437,12 +437,15 @@ select {
 }
 
 .play {
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: 8px 16px 16px;
   background: #fff;
   color: var(--navy);
+  box-sizing: border-box;
 }
 
 .hud {
@@ -577,12 +580,11 @@ select {
 
 .fit-btn {
   position: absolute;
-  right: 10px;
+  right: 8px;
   bottom: 66px;
-  width: 28px;
-  height: 28px;
-  font-size: 18px;
-  color: #9aa0b8;
+  width: 36px;
+  height: 36px;
+  color: #5c647e;
 }
 
 .win-card {
@@ -599,6 +601,7 @@ select {
   flex-direction: column;
   gap: 12px;
   z-index: 3;
+  min-width: min(280px, calc(100vw - 40px));
   animation: win-card-in 0.28s ease-out;
 }
 
@@ -613,9 +616,69 @@ select {
   }
 }
 
-.win-card p {
+.win-card p,
+.win-card-title {
   margin: 0;
   font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.win-stars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.win-star.on {
+  color: #f0b429;
+  animation: win-star-pop 0.38s cubic-bezier(0.34, 1.35, 0.64, 1) both;
+}
+
+.win-star.off {
+  color: #d7dae8;
+}
+
+.win-star.on:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.win-star.on:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+@keyframes win-star-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.win-score {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.win-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 12px;
+  font-size: 13px;
+  color: #6b7190;
+}
+
+.win-streak {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ff6a2c;
 }
 
 .win-card-actions {
@@ -623,6 +686,7 @@ select {
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .play-btn-ghost {
@@ -746,12 +810,55 @@ select {
   color: var(--muted);
 }
 
+.level-cell.tier-hard {
+  border-color: #c9b8ff;
+}
+
+.level-cell.tier-extraHard {
+  border-color: #ffb38a;
+}
+
+.level-cell.tier-nightmare {
+  border-color: #ff8a9a;
+  background: #fff6f7;
+}
+
 .star-mark {
   position: absolute;
   right: 5px;
   bottom: 4px;
   font-size: 10px;
   color: var(--muted);
+}
+
+.ftue-tip {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  z-index: 2;
+  max-width: min(300px, calc(100% - 24px));
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #1b1f33;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  animation: ftue-in 0.28s ease-out;
+}
+
+@keyframes ftue-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 .stat-row {

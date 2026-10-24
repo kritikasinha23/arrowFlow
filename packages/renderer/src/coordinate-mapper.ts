@@ -11,11 +11,17 @@ export function linesAreOn(mode: LinesMode): boolean {
   return mode !== "off";
 }
 
+/**
+ * Soft ceiling so a 2-cell tutorial does not become a billboard on ultrawide
+ * desktops. Phones usually hit fit-math first (~90–140px cells).
+ */
+export const MAX_CELL_PX = 148;
+
 export class CoordinateMapper {
   readonly width: number;
   readonly height: number;
   readonly pad: number;
-  /** Unzoomed cell size used to fit occupied content. */
+  /** Unzoomed cell size used to fit content. */
   readonly cell: number;
   readonly originX: number;
   readonly originY: number;
@@ -31,7 +37,7 @@ export class CoordinateMapper {
     boardH: number,
     cssWidth: number,
     cssHeight: number,
-    opts?: { padRatio?: number; view?: ViewTransform; content?: GridAABB },
+    opts?: { padRatio?: number; view?: ViewTransform; content?: GridAABB; maxCell?: number },
   ) {
     this.width = boardW;
     this.height = boardH;
@@ -46,7 +52,15 @@ export class CoordinateMapper {
     this.rows = Math.max(1, this.content.maxRow - this.content.minRow + 1);
     const innerW = cssWidth - pad * 2;
     const innerH = cssHeight - pad * 2;
-    this.cell = Math.min(innerW / this.cols, innerH / this.rows);
+    const maxCell = opts?.maxCell ?? MAX_CELL_PX;
+    let cell = Math.min(innerW / this.cols, innerH / this.rows);
+    // Thin strips (1–2 rows/cols) look tiny on tall phones if we only width-fit.
+    // Bump toward a presence floor; slight overflow is fine — pan/zoom exists.
+    if (this.rows <= 2 || this.cols <= 2) {
+      const presence = Math.min(innerW, innerH) * 0.28;
+      cell = Math.max(cell, presence);
+    }
+    this.cell = Math.min(cell, maxCell);
     const usedW = this.cell * this.cols;
     const usedH = this.cell * this.rows;
     this.originX = (cssWidth - usedW) / 2 - this.content.minCol * this.cell;

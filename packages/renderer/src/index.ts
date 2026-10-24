@@ -1,4 +1,4 @@
-export { CoordinateMapper } from "./coordinate-mapper";
+export { CoordinateMapper, MAX_CELL_PX } from "./coordinate-mapper";
 export { linesAreOn } from "./coordinate-mapper";
 export type { GridPoint, LinesMode, Point } from "./coordinate-mapper";
 export { BoardRenderer, hashDots, headingRays } from "./board-renderer";

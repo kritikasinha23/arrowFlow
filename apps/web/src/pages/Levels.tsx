@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { TabBar } from "../chrome/TabBar";
-import { CHAPTERS, levelNumber } from "../levels-shim";
+import { CHAPTERS, TIER_LABEL, levelNumber, tierForLevel } from "../levels-shim";
 import { getLastLevel, getStars, isLevelUnlocked } from "../storage";
 
 export function Levels() {
@@ -17,10 +17,12 @@ export function Levels() {
             {chapter.levelIds.map((id) => {
               const stars = getStars(id);
               const unlocked = isLevelUnlocked(id);
+              const tier = tierForLevel(id);
               const classes = ["level-cell"];
               if (id === current) classes.push("current");
               if (stars > 0) classes.push("starred");
               if (!unlocked) classes.push("locked");
+              if (tier) classes.push(`tier-${tier}`);
               if (!unlocked) {
                 return (
                   <span
@@ -28,8 +30,10 @@ export function Levels() {
                     className={classes.join(" ")}
                     data-testid={`level-${id}`}
                     data-stars={stars}
+                    data-tier={tier ?? ""}
                     data-locked="true"
                     aria-disabled="true"
+                    title={tier ? TIER_LABEL[tier] : undefined}
                   >
                     {levelNumber(id)}
                   </span>
@@ -42,7 +46,9 @@ export function Levels() {
                   to={`/play/${id}?mode=campaign`}
                   data-testid={`level-${id}`}
                   data-stars={stars}
+                  data-tier={tier ?? ""}
                   data-locked="false"
+                  title={tier ? TIER_LABEL[tier] : undefined}
                 >
                   {levelNumber(id)}
                   {stars > 0 ? <span className="star-mark">{stars}</span> : null}
